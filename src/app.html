@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/png" href="%sveltekit.assets%/favicon.png" />
+    <link rel="apple-touch-icon" href="%sveltekit.assets%/favicon.png" />
+    <meta name="viewport" content="width=device-width" />
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <!-- display:contents wrapper per SvelteKit's recommendation: placing the app
+         directly inside <body> can break when browser extensions inject nodes. -->
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>
