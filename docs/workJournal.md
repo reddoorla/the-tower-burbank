@@ -18,8 +18,8 @@ is trustworthy; detail above it is not, and nothing here should be cited as
 though someone wrote it down at the time. For anything before 2026-09-05 the
 commit log is the record.
 
-**What this repo is.** The Tower Burbank — a Reddoor client site on the *Blux
-migration* track, forked from `reddoor-starter` (SvelteKit 2 / Svelte 5 /
+**What this repo is.** The Tower Burbank — a Reddoor client site on the _Blux
+migration_ track, forked from `reddoor-starter` (SvelteKit 2 / Svelte 5 /
 Tailwind v4 / Prismic, deployed to the `the-tower-burbank-rd` Netlify site).
 Its homepage is not built from slices: `src/lib/blux-frozen/frozen/home.html`
 is the existing site's rendered markup committed verbatim, with every editable
@@ -35,7 +35,7 @@ Entertainment, The Burbank Portfolio) behind four toggle panels.
 the real work is one day.** 2026-07-27 carries the initial commit, the
 bootstrap rename, and the freeze-v3 artifact drop (`ba882c8`) — artifacts,
 favicon, Prismic wiring, anchors baked from the export's own runtime by
-settle's click audit, and 549 unit tests passing *unmodified* with the
+settle's click audit, and 549 unit tests passing _unmodified_ with the
 artifacts committed. Everything since is maintenance: eleven August commits, of
 which seven are Renovate bumps, plus Renovate moving to the GitHub App identity
 (#1), CI running on `staging` pushes (#13), and the remote-only `frozen_page`
