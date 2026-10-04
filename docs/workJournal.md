@@ -50,3 +50,58 @@ nothing in flight. Local `main` is **one commit behind** `origin/main` at
 down; this branch is cut from the local HEAD, so that commit is absent from it.
 Two stale Renovate branches survive on the remote (`renovate/all-minor-patch`,
 `renovate/jsdom-30.x`) with no open PR behind either.
+
+## 2026-10-04 — Off Slice Machine onto the Prismic CLI (`claude/prismic-cli`, not pushed)
+
+Slice Machine was deprecated by Prismic on 2026-09-18, and this repo was one of
+the fleet sites still carrying `slice-machine-ui`, its SvelteKit adapter and
+`concurrently` to run the two together (reddoor-maintenance#1090). It now takes
+the starter's shape (reddoor-starter#166): `prismic.config.json` replaces
+`slicemachine.config.json`, `SliceSimulator` comes from `@prismicio/svelte`
+(2.2.2 installed), `pnpm prismic:gen` regenerates `prismicio-types.d.ts` at the
+project root and `src/lib/slices/index.ts`, and a `prismic-codegen` workflow
+fails a PR whose generated files are stale. `scratchpad/regen-types.mjs`, which
+drove `@slicemachine/manager` headlessly, went with the package it loaded.
+
+**The committed types were stale.** Regenerating from the 8 custom types and
+26 slice models on disk added two exports the Slice Machine file never had,
+`FrozenPageDocument` and `FrozenPageDocumentDataSlotsItem` (111 exported names
+before, 113 after). `customtypes/frozen_page` was pulled down from Prismic in
+#12 and never regenerated into the types — the one model the homepage actually
+renders from. The 26-entry slice component map is identical apart from
+indentation. svelte-check reads 0 errors before and after; the types still
+reach the program through `src/lib/blux-catalog/page-doc.ts`'s relative
+import, so no `app.d.ts` import was needed.
+
+**Framing, measured.** Three things restricted `/slice-simulator`: `kit.csp`
+emits `frame-ancestors 'self'`, the hook set `X-Frame-Options: SAMEORIGIN` on
+every response, and netlify.toml sets the same on `/*`. On `main` the route
+was prerendered (`build/slice-simulator.html`), so in production the hook
+never ran for it, its CSP sat in a `<meta>` that carries no frame-ancestors,
+and the static header won: `curl -I` on the live
+`the-tower-burbank-rd.netlify.app/slice-simulator` returns
+`x-frame-options: SAMEORIGIN`. Now the route is `prerender = false` and the
+hook (via `src/lib/security/cms-framing.ts`) drops X-Frame-Options and widens
+frame-ancestors there only. From `vite preview` on the branch build:
+`/slice-simulator` has no X-Frame-Options and
+`frame-ancestors 'self' http://localhost:* https://*.prismic.io https://prismic.io`;
+`/contact` (`frame-ancestors 'self'` + SAMEORIGIN), `/health` (SAMEORIGIN) and
+`/` (prerendered, no headers in preview) are byte-for-byte what `main` sends.
+
+**Mutations.** Seven vitest cases in `src/hooks.server.test.ts` (549 unit
+tests on `main`, 556 here). Each of these went red and was restored: dropping
+the hook's X-Frame-Options delete (1 red, the upstream-XFO case), flipping the
+route to `prerender = true` (1), making `widenFrameAncestors` return the policy
+unchanged (2), making `isCmsFramedRoute` always false (4), dropping the
+SAMEORIGIN set on ordinary routes (2). The codegen gate went red on an added
+field in `RichText/model.json` and green again on restore.
+
+**Not proven: that the models match Prismic.** The site is absent from the
+nightly drift log, and the Prismic connector answered both
+`list_custom_types` and `list_shared_slices` with `Prismic MCP is not
+activated for repository "the-tower-burbank"`. Without that comparison the
+branch is committed but not pushed. An admin can activate MCP at
+https://the-tower-burbank.prismic.io/builder/settings/mcp/. Also found and left:
+CLAUDE.md says this repo has no `pnpm verify`, but `package.json` has one
+(`lint && check && build && test`), and this repo has no `prismic-models`
+workflow, so models do not reach Prismic on merge here.
