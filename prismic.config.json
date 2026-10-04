@@ -1,0 +1,5 @@
+{
+  "repositoryName": "the-tower-burbank",
+  "libraries": ["./src/lib/slices"],
+  "routes": []
+}
