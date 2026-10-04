@@ -8,7 +8,7 @@ A forkable starting point for all SvelteKit, Tailwind + Prismic sites developed 
 
 - **[SvelteKit](https://kit.svelte.dev/)** — Frontend framework with excellent DX and component-driven design
 - **[Tailwind CSS v4](https://tailwindcss.com/)** — Utility-first CSS
-- **[Prismic CMS](https://prismic.io/)** — Headless CMS with Slice Machine for flexible content modeling
+- **[Prismic CMS](https://prismic.io/)** — Headless CMS; models are edited in the Type Builder or as JSON here, and `pnpm prismic:gen` regenerates the types
 - **[Netlify](https://www.netlify.com/)** — Deployment and hosting
 - **[Vitest](https://vitest.dev/)** — Unit testing
 
@@ -85,29 +85,29 @@ Import `fade`/`fly`/`slide` from `$lib/transitions` instead of `svelte/transitio
    ```
 
 3. Create a new Prismic repository
-4. Update `slicemachine.config.json` with your new Prismic repo name
-5. Start the dev server (runs Vite + Slice Machine concurrently):
+4. Update `prismic.config.json` with your new Prismic repo name
+5. Start the dev server:
 
    ```bash
    pnpm dev
    ```
 
-6. Push your custom types/slices to Prismic
+6. Edit models in Prismic's Type Builder, or as JSON here and run `pnpm prismic:gen` (never `prismic push` or `prismic pull`: both delete to match)
 7. Build your site using slices for complex CMS needs, or custom types for simpler setups
 
 ## Scripts
 
-| Command             | Description                      |
-| ------------------- | -------------------------------- |
-| `pnpm dev`          | Start dev server + Slice Machine |
-| `pnpm build`        | Production build                 |
-| `pnpm preview`      | Preview production build         |
-| `pnpm check`        | Svelte type checking             |
-| `pnpm lint`         | Lint with ESLint + Prettier      |
-| `pnpm format`       | Auto-format with Prettier        |
-| `pnpm test:unit`    | Run unit tests with Vitest       |
-| `pnpm test:smoke`   | Run Playwright + axe a11y checks |
-| `pnpm slicemachine` | Start Slice Machine UI           |
+| Command            | Description                      |
+| ------------------ | -------------------------------- |
+| `pnpm dev`         | Start dev server                 |
+| `pnpm build`       | Production build                 |
+| `pnpm preview`     | Preview production build         |
+| `pnpm check`       | Svelte type checking             |
+| `pnpm lint`        | Lint with ESLint + Prettier      |
+| `pnpm format`      | Auto-format with Prettier        |
+| `pnpm test:unit`   | Run unit tests with Vitest       |
+| `pnpm test:smoke`  | Run Playwright + axe a11y checks |
+| `pnpm prismic:gen` | Regenerate Prismic types + index |
 
 ## Project Structure
 
