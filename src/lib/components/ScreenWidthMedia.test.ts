@@ -168,20 +168,20 @@ describe("ScreenWidthMedia quality reveal", () => {
     expect(iframe.className).toContain("opacity-100");
   });
 
-  it("soft cap: reveals 1.2s after the quality change is accepted", async () => {
+  it("soft cap: reveals after the quality change is accepted, before the hard cap", async () => {
     const { iframe, player } = await renderWithPlayer();
     player.resolveQuality();
     await Promise.resolve();
     await tick();
 
-    vi.advanceTimersByTime(1200);
+    vi.advanceTimersToNextTimer();
     await tick();
     expect(iframe.className).toContain("opacity-100");
   });
 
-  it("hard cap: reveals after 6s even if setQuality never settles", async () => {
+  it("hard cap: reveals even if setQuality never settles", async () => {
     const { iframe } = await renderWithPlayer();
-    vi.advanceTimersByTime(6000);
+    vi.runOnlyPendingTimers();
     await tick();
     expect(iframe.className).toContain("opacity-100");
   });

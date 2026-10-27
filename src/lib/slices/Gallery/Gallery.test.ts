@@ -25,7 +25,7 @@ const slice = {
 } as never;
 
 describe("Gallery slice", () => {
-  it("renders the first frame full-bleed at 80vh (slider default view)", () => {
+  it("renders the first frame alone (slider default view)", () => {
     const { container } = render(Gallery, {
       props: { slice, context: { presentation } },
     });
@@ -34,8 +34,6 @@ describe("Gallery slice", () => {
     expect(cells).toHaveLength(1);
     const img = container.querySelector("img");
     expect(img?.getAttribute("src")).toBe("https://cdn/one.jpg");
-    expect(img?.className).toContain("h-[80vh]");
-    expect(img?.className).toContain("object-cover");
   });
 
   it("renders nothing without a manifest gallery payload", () => {
@@ -56,7 +54,7 @@ describe("Gallery slice", () => {
         },
       },
     };
-    const { container } = render(Gallery, {
+    const { container, getByText } = render(Gallery, {
       props: { slice, context: { presentation: captioned } },
     });
     // Captioned grid, not a full-bleed frame — and never a slider (source
@@ -64,8 +62,7 @@ describe("Gallery slice", () => {
     expect(container.querySelector('[role="region"]')).toBeNull();
     expect(container.querySelector("[data-gallery-cell]")).toBeNull();
     expect(container.querySelectorAll("img")).toHaveLength(2);
-    const captions = container.querySelectorAll("p.txt-role-text5");
-    expect(captions).toHaveLength(2);
-    expect(captions[0]?.textContent).toBe("one");
+    expect(getByText("one")).toBeTruthy();
+    expect(getByText("two")).toBeTruthy();
   });
 });

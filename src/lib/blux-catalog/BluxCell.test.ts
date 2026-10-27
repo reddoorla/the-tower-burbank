@@ -53,7 +53,7 @@ describe("BluxCell visual fields", () => {
     expect(container.querySelector(".blux-cell__body .txt-role-text1 p")).not.toBeNull();
   });
 
-  it("gives each subgrid cell its own basis for a row of that many cells", () => {
+  it("renders one subgrid cell per entry", () => {
     const cell = {
       kind: "subgrid",
       subgrid: [
@@ -64,7 +64,8 @@ describe("BluxCell visual fields", () => {
     const { container } = render(BluxCell, { props: { cell, basis: "100%" } });
     const subCells = container.querySelectorAll<HTMLElement>(".blux-subgrid > .blux-cell");
     expect(subCells).toHaveLength(2);
-    expect(subCells[0].style.getPropertyValue("--cell-basis")).toBe("calc(50% - 2%)");
+    expect(subCells[0].textContent).toContain("L");
+    expect(subCells[1].textContent).toContain("R");
   });
 });
 

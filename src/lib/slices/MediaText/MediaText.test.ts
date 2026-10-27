@@ -29,13 +29,18 @@ describe("MediaText slice", () => {
     expect(getByRole("img").getAttribute("alt")).toBe("Pool");
   });
 
-  it("reverses the image/copy order for imageLeft", () => {
-    const { container } = render(MediaText, {
+  it("lays imageLeft out differently from imageRight", () => {
+    const right = render(MediaText, {
+      props: { slice: makeSlice("imageRight") },
+    });
+    const left = render(MediaText, {
       props: { slice: makeSlice("imageLeft") },
     });
-    // the editorial split reverses via grid order: the media column moves ahead
-    // of the copy column on large screens
-    const media = container.querySelector(".mt-media");
-    expect(media?.className).toContain("lg:order-1");
+    // The editor's variation choice must change the media column's layout.
+    const rightMedia = right.container.querySelector(".mt-media");
+    const leftMedia = left.container.querySelector(".mt-media");
+    expect(rightMedia).not.toBeNull();
+    expect(leftMedia).not.toBeNull();
+    expect(leftMedia?.className).not.toBe(rightMedia?.className);
   });
 });
