@@ -123,9 +123,8 @@ describe("BluxSection slice", () => {
     const cellsEl = container.querySelector(".blux-section__cells") as HTMLElement;
     expect(cellsEl.getAttribute("style")).toContain("max-width: 1100px");
     expect(cellsEl.getAttribute("style")).toContain("--band-pad: 80px 4%");
-    const cells = container.querySelectorAll<HTMLElement>(".blux-section__cells > .blux-cell");
-    expect(cells[0].style.getPropertyValue("--cell-basis")).toBe("calc(50% - 2%)");
-    expect(cells[1].style.getPropertyValue("--cell-basis")).toBe("calc(70% - 2%)");
+    // Whether the cells share a row is measured in a browser:
+    // src/lib/blux/layout.browser.test.ts.
   });
 
   it("wraps the heading in its type-role container when heading_role is set", () => {
