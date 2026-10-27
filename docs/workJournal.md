@@ -132,3 +132,31 @@ top-level rule of a sheet whose `media`, and any `@import`'s, matches the screen
 By hand against the dev server at 1440px: the dropped sheet, the `@media print` wrapper,
 `<style media="print">`, the renamed classes and the truncated artifact are all red; a changed
 colour, a 3000px taller page and one renamed selector in the artifact stay green.
+
+Review round 4 found that round 3's floor still measured the render against itself. "More than
+half the page's classed elements" counts only elements that still carry a class, so an element that
+loses its class attribute leaves the numerator and the denominator together: strip the class from 2
+of every 5 elements and the page is 25258px, taller than the fully unstyled one, with 359 of 445
+classed elements wearing an artifact class, green. Round 3's paragraph above also claimed a check
+on "any `@import`'s" media that the code never made: `document.styleSheets` does not list imported
+sheets, so the walk up `ownerRule` never ran, and an `@import url(...) screen` that renders
+correctly went red with 97 rules "not applied". The fraction is gone. The spec now parses
+`the-pointe.html` itself and takes its floors from the template, not the render: at least as many
+rendered elements wear an artifact class or id as template elements do (605 on both sides of the
+known-good run); every artifact class and id is worn on the page at least as often as in the
+template; and every artifact rule that matches the template matches the page. The last two answer
+what else lets the render drift while the count holds: swapping `blocks0container` for
+`blockcontainer` keeps 605 of 605 and fails on the token count, and retagging the nav's `<ul>` as
+`<ol>` or dropping the menu icon's `data-line` attributes keeps every class and fails on the rules
+they break. The live-rule walk now descends into each `CSSImportRule`'s sheet with that import's
+own media. By hand against the dev server at 1440px: the stripped classes, the classes stripped in
+the nav and footer only, renamed classes, a swapped class, the template served cut in half, the
+retagged list, the dropped attributes, `<style media="print">`, the `@media print` wrapper, the
+dropped sheet, the first half of the CSS emitted and `@import ... print` are all red;
+`@import ... screen`, a changed colour, a 3000px taller page, one renamed selector and an appended
+block of slice-like markup stay green. One limit stays, and round 3's "truncated artifact" red
+depended on the fraction to hide it: the floors move with the committed pair, so the stylesheet
+file cut short after its `body{}` rule (239 of 239, 3 rules on the page) passes, the same way one
+renamed selector must. Cut to no class rule at all, it fails. Telling a truncated file from an edit
+needs a witness outside the pair, and the slot manifest is not one: 4 of its 156 slots have no
+token in the known-good template.
