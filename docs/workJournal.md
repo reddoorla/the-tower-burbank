@@ -50,3 +50,44 @@ nothing in flight. Local `main` is **one commit behind** `origin/main` at
 down; this branch is cut from the local HEAD, so that commit is absent from it.
 Two stale Renovate branches survive on the remote (`renovate/all-minor-patch`,
 `renovate/jsdom-30.x`) with no open PR behind either.
+
+## 2026-10-27 — Unit tests stop pinning Blux class lists; layout is measured in a browser (#TBD)
+
+The fleet test audit (reddoorla/reddoor-workspace `audits/2026-10-26-fleet-test-audit/report.md`)
+held every unit assertion in this repo to the starter's "Tests build; they don't freeze" rule.
+A reviewer wrote one mutant per removed assertion and sorted the 45 by what a visitor would lose.
+31 were design values: gutters, insets, a 1280px column, a 400ms cascade, object-fit, which side
+the image sits on, centred or top-aligned copy. 9 were invisible: a wrapper that fills its parent
+anyway, a `--node-mr` class that is a no-op without the variable, and two ScreenWidthMedia timer
+caps on a component only `/dev/a11y-fixtures` renders. Those went. The `animateIn.test.ts` cascade
+pin stays for now: it is an unchanged copy of the starter's test, and the starters fix it once and
+cherry-pick.
+
+Five were real losses, and each was a Tailwind class pin standing in for a layout fact: columns
+that stop stacking on a phone (`basis-full`), overlay-tile captions that never show on hover
+(`group`) or show at 10% (`group-hover:opacity-100`), a cropped tile's image escaping its box to
+cover the whole band (`relative`), and SplitFeature's image wrapping under the copy at desktop
+(the `- 2%` gutter reserve). jsdom cannot lay anything out, so the keeps are a new vitest file,
+`src/lib/blux/layout.browser.test.ts`: it renders the component with `svelte/server`, compiles
+`src/app.css` with Tailwind for exactly the classes in that markup, sets it in headless Chromium at
+1280 or 390px, and measures boxes. It asserts "the second cell's top equals the first's" and "the
+second cell starts below the first one's bottom", "computed opacity is 1 after a hover", "the img's
+box equals its tile's box". No px or class in it. All five reviewer mutants turn it red, each in the
+test it was written for (8 of 8 with three more below), and it runs in about 12s.
+
+The first version of the diff replaced the basis pins in Grid, BluxGrid and BluxCell with
+`toBe(rowCellBases(cells))` and `toBe(gridCellBasis(...))`. A reviewer caught that those compare the
+helper with itself, so a broken reserve passes. They are gone; the browser file asserts the outcome
+instead (four cards on the first line of a cols=4 grid, two BluxGrid cells on one row at desktop and
+stacked on a phone), with three extra mutants proving it: no reserve in `rowCellBases`, none in
+`gridCellBasis`, and `.blux-cell` keeping its desktop basis on a phone. All three red.
+
+`tests/gate/frozen-fidelity.spec.ts` loses its 15000–15700px page-height band and the 500ms sleep
+before it (geometry and a fixed sleep, both barred from the gate). The diff also dropped the "≥ 56
+baked backgrounds" count, which the Playwright reviewer marked worth keeping: a freeze that stops
+baking `data-*` backgrounds blanks every band photo and throws nothing. It is restored unchanged.
+The spec passes against a production build (`REDDOOR_GATE_SERVER=preview`,
+`VITE_REDDOOR_GATE_FIXTURES=1`).
+
+Surprise: CI gets Chromium before the unit tests (`playwright install` is step 11, `Test` step 13
+of the shared workflow), which is what makes a browser-measured vitest file possible here at all.

@@ -2,9 +2,10 @@ import { test, expect, type ConsoleMessage } from "@playwright/test";
 
 // Frozen-render contract gate. Drives the offline /dev/blux-frozen route (the
 // real the-pointe freeze artifacts rendered through the production <FrozenPage>)
-// and asserts no residual slot token survives and nothing throws. Fonts +
-// Blux-CDN source images legitimately load from third-party hosts here (dev
-// fixture); real errors still fail via `pageerror`.
+// and asserts every media background is baked, no residual slot token
+// survives, and nothing throws. Fonts + Blux-CDN source images legitimately
+// load from third-party hosts here (dev fixture); real errors still fail via
+// `pageerror`.
 const ALLOWED_CONSOLE: RegExp[] = [
   /cloudfront\.net/i,
   /fonts\.g(oogleapis|static)\.com/i,
@@ -16,7 +17,9 @@ const allowed = (s: string) => ALLOWED_CONSOLE.some((re) => re.test(s));
 // it at that same width.
 test.use({ viewport: { width: 1440, height: 900 } });
 
-test("frozen the-pointe render contract: slots substituted, no page errors", async ({ page }) => {
+test("frozen the-pointe render contract: backgrounds baked, slots substituted, no page errors", async ({
+  page,
+}) => {
   const errors: string[] = [];
   page.on("console", (m: ConsoleMessage) => {
     if (m.type() === "error" && !allowed(m.text()) && !allowed(m.location()?.url ?? "")) {
@@ -31,6 +34,16 @@ test("frozen the-pointe render contract: slots substituted, no page errors", asy
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   // Wait for web fonts to settle (they drive text height) rather than a blind sleep.
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
+
+  // All 56 data-* backgrounds are baked as inline declarations: a freeze that
+  // stops baking them leaves every band photo blank and throws no page error.
+  const backgrounds = await page.evaluate(
+    () =>
+      [...document.querySelectorAll<HTMLElement>("*")].filter((e) =>
+        /url\(/.test(e.style.backgroundImage),
+      ).length,
+  );
+  expect(backgrounds).toBeGreaterThanOrEqual(56);
 
   // No residual slot token survived substitution.
   expect(await page.content()).not.toContain("⟦");
