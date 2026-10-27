@@ -160,3 +160,20 @@ file cut short after its `body{}` rule (239 of 239, 3 rules on the page) passes,
 renamed selector must. Cut to no class rule at all, it fails. Telling a truncated file from an edit
 needs a witness outside the pair, and the slot manifest is not one: 4 of its 156 slots have no
 token in the known-good template.
+
+Review round 5 found that round 4's floors had no ceiling. "At least as many as the template"
+passes a render that emits the template twice: with `{@html html}{@html html}` in `FrozenPage.svelte`
+the page is 30433px with every block, the nav and the footer doubled, 1210 elements wearing an
+artifact class against the template's 605, every rule still matching and every sheet live, and the
+gate was green. main's 15000-15700px band refused it, and this PR removes that band. Since
+`<FrozenPage>` renders the template whole, the counts are exact, not floors, and no design value is
+needed to say so: the rendered elements wearing an artifact class or id now equal the template's,
+and every artifact class and id is worn exactly as often as in the template. By hand against the
+dev server at 1440px, the doubled render is red (1210 of 605, 78 tokens mismatched, `.page0` 2 of
+1), and so is every round-4 red (the stripped classes, the classes stripped in the nav and footer,
+renamed classes, the swapped class, the template cut in half, the retagged list, the dropped
+attributes, `<style media="print">`, the `@media print` wrapper, the dropped sheet, half the CSS,
+`@import ... print`). Known-good (605 of 605), `@import ... screen`, a changed colour, a 3000px
+taller page, one renamed selector and an appended section of 20 Tailwind-classed cells (16017px,
+still 605 of 605, because those cells wear no artifact class) stay green. Round 4's stated limit
+stands unchanged: the stylesheet cut after `body{}` still passes at 239 of 239.

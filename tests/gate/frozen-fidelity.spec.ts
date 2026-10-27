@@ -25,7 +25,7 @@ const freezeCss = readFileSync(
   new URL("../../src/routes/dev/blux-frozen/the-pointe.style.css", import.meta.url),
   "utf8",
 ).trim();
-// The freeze's tokenized template, the markup the route renders: the floor for
+// The freeze's tokenized template, the markup the route renders: the counts for
 // how much of the page must wear the artifact's classes and ids.
 const freezeHtml = readFileSync(
   new URL("../../src/routes/dev/blux-frozen/the-pointe.html", import.meta.url),
@@ -55,20 +55,21 @@ test("frozen the-pointe render contract: stylesheet applied, backgrounds baked, 
   // instead of the live layout) and throws nothing, so the evidence has to be
   // positive, and it has to come from the artifact's own vocabulary: generic
   // rules (`body`, `footer a`, `img`) match any page, so only rules whose every
-  // selector names a class or an id count. The floors come from the committed
+  // selector names a class or an id count. The counts come from the committed
   // template itself, parsed here, never from the render, so a render that loses
   // classes cannot lower its own bar. <FrozenPage> renders the template whole
   // (it only substitutes slot tokens and rewrites hrefs), so these are
   // structural, not design values, and follow any edit to the artifact pair.
-  // The flip side: an edit to the committed pair moves the floors with it, so a
+  // The flip side: an edit to the committed pair moves the counts with it, so a
   // template or stylesheet cut short on disk reads as a smaller artifact and
   // passes while any class rule still matches (one renamed selector must pass
   // too, and nothing here can tell the two apart without a pinned fraction; the
   // slot manifest is no witness, since 4 of its 156 slots have no token in the
   // known-good template). Four things must hold:
-  // - at least as many rendered elements wear an artifact class or id as
-  //   template elements do (renamed, stripped or truncated markup fails);
-  // - every artifact class and id appears on the page at least as often as in
+  // - exactly as many rendered elements wear an artifact class or id as
+  //   template elements do (renamed, stripped, truncated or doubled markup
+  //   fails);
+  // - every artifact class and id appears on the page exactly as often as in
   //   the template (classes moved, merged or swapped for others fail even when
   //   the element count still matches);
   // - every one of those rules that matches the template matches the page
@@ -116,8 +117,8 @@ test("frozen the-pointe render contract: stylesheet applied, backgrounds baked, 
       };
       const expected = census(templateDoc.body);
       const rendered = census(document.body);
-      const short = [...expected.counts]
-        .filter(([t, n]) => (rendered.counts.get(t) ?? 0) < n)
+      const mismatched = [...expected.counts]
+        .filter(([t, n]) => (rendered.counts.get(t) ?? 0) !== n)
         .map(([t, n]) => `${t} ${rendered.counts.get(t) ?? 0}/${n}`);
 
       const onScreen = (media: MediaList) =>
@@ -153,7 +154,7 @@ test("frozen the-pointe render contract: stylesheet applied, backgrounds baked, 
       return {
         templateWearing: expected.wearing,
         wearing: rendered.wearing,
-        short,
+        mismatched,
         lost,
         onPage: onPage.length,
         notLive: onPage.filter((r) => !live.has(r.selectorText)).map((r) => r.selectorText),
@@ -164,10 +165,11 @@ test("frozen the-pointe render contract: stylesheet applied, backgrounds baked, 
   expect(
     applied.wearing,
     `rendered elements wearing an artifact class or id (the template has ${applied.templateWearing})`,
-  ).toBeGreaterThanOrEqual(applied.templateWearing);
-  expect(applied.short, "artifact classes and ids worn less often than in the template").toEqual(
-    [],
-  );
+  ).toBe(applied.templateWearing);
+  expect(
+    applied.mismatched,
+    "artifact classes and ids worn more or less often than in the template",
+  ).toEqual([]);
   expect(applied.lost, "artifact rules that match the template but not the page").toEqual([]);
   expect(applied.onPage, "artifact rules naming a class or id that match the page").toBeGreaterThan(
     0,
