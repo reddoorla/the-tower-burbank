@@ -168,7 +168,7 @@ describe("ScreenWidthMedia quality reveal", () => {
     expect(iframe.className).toContain("opacity-100");
   });
 
-  it("soft cap: reveals after the quality change is accepted, before the hard cap", async () => {
+  it("reveals on the next timer once the quality change is accepted, with no bufferend", async () => {
     const { iframe, player } = await renderWithPlayer();
     player.resolveQuality();
     await Promise.resolve();
