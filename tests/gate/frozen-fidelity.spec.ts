@@ -60,18 +60,25 @@ test("frozen the-pointe render contract: stylesheet applied, backgrounds baked, 
   // classes cannot lower its own bar. <FrozenPage> renders the template whole
   // (it only substitutes slot tokens and rewrites hrefs), so these are
   // structural, not design values, and follow any edit to the artifact pair.
-  // Four things must hold:
+  // The flip side: an edit to the committed pair moves the floors with it, so a
+  // template or stylesheet cut short on disk reads as a smaller artifact and
+  // passes while any class rule still matches (one renamed selector must pass
+  // too, and nothing here can tell the two apart without a pinned fraction; the
+  // slot manifest is no witness, since 4 of its 156 slots have no token in the
+  // known-good template). Four things must hold:
   // - at least as many rendered elements wear an artifact class or id as
   //   template elements do (renamed, stripped or truncated markup fails);
   // - every artifact class and id appears on the page at least as often as in
   //   the template (classes moved, merged or swapped for others fail even when
   //   the element count still matches);
-  // - some of those rules match the page;
+  // - every one of those rules that matches the template matches the page
+  //   (markup re-nested, unwrapped or re-attributed while keeping its classes
+  //   fails), and some do;
   // - every one that matches is a live rule of a sheet the screen applies: not
   //   disabled and its `media` matching via matchMedia, walking into `@import`
   //   sheets with each import's own media, so `<style media="print">`, an
   //   `@media print` wrapper, an `@import ... print`, a dropped sheet and a
-  //   truncated one all fail.
+  //   sheet served cut short all fail.
   const applied = await page.evaluate(
     ({ css, html }) => {
       const matches = (sel: string) => {
@@ -90,6 +97,7 @@ test("frozen the-pointe render contract: stylesheet applied, backgrounds baked, 
         new Set(named.flatMap((r) => [...r.selectorText.matchAll(re)].map((m) => m[1])));
       const ownClasses = tokens(/\.(-?[_a-zA-Z][\w-]*)/g);
       const ownIds = tokens(/#(-?[_a-zA-Z][\w-]*)/g);
+      const templateDoc = new DOMParser().parseFromString(html, "text/html");
 
       // Every artifact class or id an element wears, as `.c` / `#i` tokens.
       const worn = (e: Element) => [
@@ -106,7 +114,7 @@ test("frozen the-pointe render contract: stylesheet applied, backgrounds baked, 
         }
         return { wearing, counts };
       };
-      const expected = census(new DOMParser().parseFromString(html, "text/html").body);
+      const expected = census(templateDoc.body);
       const rendered = census(document.body);
       const short = [...expected.counts]
         .filter(([t, n]) => (rendered.counts.get(t) ?? 0) < n)
@@ -131,11 +139,22 @@ test("frozen the-pointe render contract: stylesheet applied, backgrounds baked, 
         }
       };
       const live = new Set([...document.styleSheets].flatMap(liveRules));
+      const inTemplate = (sel: string) => {
+        try {
+          return templateDoc.querySelector(sel) !== null;
+        } catch {
+          return false;
+        }
+      };
       const onPage = named.filter((r) => matches(r.selectorText));
+      const lost = named
+        .filter((r) => inTemplate(r.selectorText) && !matches(r.selectorText))
+        .map((r) => r.selectorText);
       return {
         templateWearing: expected.wearing,
         wearing: rendered.wearing,
         short,
+        lost,
         onPage: onPage.length,
         notLive: onPage.filter((r) => !live.has(r.selectorText)).map((r) => r.selectorText),
       };
@@ -149,6 +168,7 @@ test("frozen the-pointe render contract: stylesheet applied, backgrounds baked, 
   expect(applied.short, "artifact classes and ids worn less often than in the template").toEqual(
     [],
   );
+  expect(applied.lost, "artifact rules that match the template but not the page").toEqual([]);
   expect(applied.onPage, "artifact rules naming a class or id that match the page").toBeGreaterThan(
     0,
   );
