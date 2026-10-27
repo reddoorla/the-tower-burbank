@@ -3,11 +3,11 @@ import { readFileSync } from "node:fs";
 
 // Frozen-render contract gate. Drives the offline /dev/blux-frozen route (the
 // real the-pointe freeze artifacts rendered through the production <FrozenPage>)
-// and asserts the freeze's own stylesheet is in the head and styles the markup,
-// every media background is baked, no residual slot token survives, and
-// nothing throws. Fonts + Blux-CDN source images legitimately
-// load from third-party hosts here (dev fixture); real errors still fail via
-// `pageerror`.
+// and asserts the freeze's own class and id rules are applied on screen to
+// markup that carries those classes, every media background is baked, no
+// residual slot token survives, and nothing throws. Fonts + Blux-CDN source
+// images legitimately load from third-party hosts here (dev fixture); real
+// errors still fail via `pageerror`.
 const ALLOWED_CONSOLE: RegExp[] = [
   /cloudfront\.net/i,
   /fonts\.g(oogleapis|static)\.com/i,
@@ -44,12 +44,23 @@ test("frozen the-pointe render contract: stylesheet applied, backgrounds baked, 
   // Wait for web fonts to settle (they drive text height) rather than a blind sleep.
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
 
-  // The freeze's stylesheet is applied to the frozen markup. Without it the
-  // page renders as unstyled stacked HTML (about 25000px instead of the live
-  // layout) and throws nothing, so the evidence has to be positive: rules
-  // parsed from the artifact itself that match elements on the page must be
-  // live, top-level rules of a stylesheet the document applies. Counted, not
-  // pinned: any one is enough.
+  // The freeze's own rules style the freeze's own markup on screen. Without
+  // its stylesheet the page renders as unstyled stacked HTML (about 25000px
+  // instead of the live layout) and throws nothing, so the evidence has to be
+  // positive, and it has to come from the artifact's own vocabulary: generic
+  // rules (`body`, `footer a`, `img`) match any page, so only rules whose every
+  // selector names a class or an id count. Three things must hold, none of
+  // them a height or a design value, because the test reads the same artifact
+  // the route renders and follows any edit to it:
+  // - the frozen markup carries the artifact's classes: most of its classed
+  //   elements wear a class some artifact rule names (a template and
+  //   stylesheet out of sync, or an enhance step that rewrites class
+  //   attributes, fails here);
+  // - some of those rules match the page;
+  // - every one that matches is a live top-level rule of a sheet the screen
+  //   applies: not disabled, and its `media` (and any `@import`'s) matching
+  //   via matchMedia, so `<style media="print">`, an `@media print` wrapper, a
+  //   dropped sheet and a truncated one all fail.
   const applied = await page.evaluate((css) => {
     const matches = (sel: string) => {
       try {
@@ -60,25 +71,50 @@ test("frozen the-pointe render contract: stylesheet applied, backgrounds baked, 
     };
     const own = new CSSStyleSheet();
     own.replaceSync(css);
-    const wanted = new Set(
-      [...own.cssRules]
-        .filter((r): r is CSSStyleRule => r instanceof CSSStyleRule)
-        .map((r) => r.selectorText)
-        .filter(matches),
+    const named = [...own.cssRules]
+      .filter((r): r is CSSStyleRule => r instanceof CSSStyleRule)
+      .filter((r) => r.selectorText.split(",").every((part) => /[.#]-?[_a-zA-Z]/.test(part)));
+    const ownClasses = new Set(
+      named.flatMap((r) => [...r.selectorText.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)].map((m) => m[1])),
     );
-    const live = [...document.styleSheets].filter((sheet) => !sheet.disabled);
-    return live
-      .flatMap((sheet) => {
+    const classed = [...document.querySelectorAll("body [class]")];
+    const wearing = classed.filter((e) => [...e.classList].some((c) => ownClasses.has(c)));
+
+    const onScreen = (media: MediaList) =>
+      media.length === 0 || window.matchMedia(media.mediaText).matches;
+    const applies = (sheet: CSSStyleSheet) => {
+      for (let s: CSSStyleSheet | null = sheet; s; s = s.ownerRule?.parentStyleSheet ?? null) {
+        if (s.disabled || !onScreen(s.media)) return false;
+      }
+      return true;
+    };
+    const live = new Set(
+      [...document.styleSheets].filter(applies).flatMap((sheet) => {
         try {
-          return [...sheet.cssRules];
+          return [...sheet.cssRules]
+            .filter((r): r is CSSStyleRule => r instanceof CSSStyleRule)
+            .map((r) => r.selectorText);
         } catch {
           return []; // a cross-origin font sheet
         }
-      })
-      .filter((r): r is CSSStyleRule => r instanceof CSSStyleRule && wanted.has(r.selectorText))
-      .length;
+      }),
+    );
+    const onPage = named.filter((r) => matches(r.selectorText));
+    return {
+      classed: classed.length,
+      wearing: wearing.length,
+      onPage: onPage.length,
+      notLive: onPage.filter((r) => !live.has(r.selectorText)).map((r) => r.selectorText),
+    };
   }, freezeCss);
-  expect(applied).toBeGreaterThan(0);
+  expect(
+    applied.wearing * 2,
+    `${applied.wearing} of ${applied.classed} classed elements wear an artifact class`,
+  ).toBeGreaterThan(applied.classed);
+  expect(applied.onPage, "artifact rules naming a class or id that match the page").toBeGreaterThan(
+    0,
+  );
+  expect(applied.notLive, "matching artifact rules the screen does not apply").toEqual([]);
 
   // All 56 data-* backgrounds are baked as inline declarations: a freeze that
   // stops baking them leaves every band photo blank and throws no page error.

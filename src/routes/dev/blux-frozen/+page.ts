@@ -5,8 +5,8 @@ import manifest from "./the-pointe.slots.json";
 // Offline frozen-render gate: the real the-pointe freeze artifacts (template +
 // style + slot manifest) rendered through the production <FrozenPage>. The
 // Playwright gate (tests/gate/frozen-fidelity) drives this route and asserts the
-// freeze's stylesheet styles the markup, backgrounds are baked, and no token
-// survives. Regen via
+// freeze's own class and id rules apply on screen to the markup that carries
+// those classes, backgrounds are baked, and no token survives. Regen via
 //   node dist/cli/bin.js blux freeze ~/Desktop/thePointe --out <tmp> --site the-pointe
 //   cp <tmp>/frozen/the-pointe.{html,style.css} <tmp>/the-pointe.slots.json this-dir/
 // #717: this was `true`, which baked a dev-only fixture into the production

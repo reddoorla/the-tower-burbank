@@ -116,3 +116,19 @@ artifact both stay green. `FrozenPage.test.ts` now also asserts the style reache
 The crop test's fixture is now a 100×300 data-URI SVG, since an aborted remote image has no
 intrinsic size and could not show an image escaping vertically without `h-full`; and the hover test
 keeps only the legibility floor, because how visible a caption is at rest is design.
+
+Review round 3 found that round 2's check proved less than the paragraph above says. "At least one
+of them" counted generic rules (`body`, `footer a`, `img, video`), which match any page, so it
+never showed the artifact's rules reached its markup: rename every class in the template (a
+template and stylesheet out of sync) and the page stacks to 24829px with 8 live generic rules,
+green; truncate the artifact after its `body{}` rule, 18750px, green. And "a stylesheet the
+document applies" checked only `disabled`, which is false for `<style media="print">`: that page
+is the 25046px unstyled one, green with 104 "live" rules. The root cause of both was accepting any
+one live rule as proof. The check now counts only artifact rules whose every selector names a class
+or an id, and asks three things of them: more than half the page's classed elements wear a class
+those rules name (603 of 743 on the known-good render; 0 when the classes are renamed, 239 when
+truncated); some of those rules match the page (97 of 165); and every rule that matches is a live
+top-level rule of a sheet whose `media`, and any `@import`'s, matches the screen by `matchMedia`.
+By hand against the dev server at 1440px: the dropped sheet, the `@media print` wrapper,
+`<style media="print">`, the renamed classes and the truncated artifact are all red; a changed
+colour, a 3000px taller page and one renamed selector in the artifact stay green.
