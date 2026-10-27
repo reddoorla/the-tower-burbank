@@ -177,3 +177,42 @@ attributes, `<style media="print">`, the `@media print` wrapper, the dropped she
 taller page, one renamed selector and an appended section of 20 Tailwind-classed cells (16017px,
 still 605 of 605, because those cells wear no artifact class) stay green. Round 4's stated limit
 stands unchanged: the stylesheet cut after `body{}` still passes at 239 of 239.
+
+## 2026-10-27 — Inherit the starters' test-pin fixes (`claude/fleet-test-audit-inherit`)
+
+Batch C of the fleet test audit (`reddoorla/reddoor-workspace`
+`audits/2026-10-26-fleet-test-audit/report.md`) fixed design-value and exact-count pins in the
+starters (reddoor-starter#225, reddoor-starter-blux#53), and this site carries the starters' copies
+of those tests. Its Blux sibling took the same port as the-pointe-burbank#55, after two review
+rounds, and that PR's final test files are the source here. All three of this site's files were
+byte-identical to what the-pointe-burbank started from, and the code under test (`animateIn.ts`,
+`ProductListing.svelte`, `BluxCollection/index.svelte`) is byte-identical to the-pointe-burbank's
+too, so the files were copied whole rather than ported by hand. #38 touched none of them.
+the-pointe-burbank#55 left `ScreenWidthMedia` alone, so it is not part of this port.
+
+`src/lib/actions/animateIn.test.ts` "honors a custom delayMax" pinned `transitionDelay` to exactly
+`400ms` at `delayMax: 800`, a duration, which the audit's rule keeps out of the gate (the rule is
+`reddoor-starter`'s CLAUDE.md "Tests build; they don't freeze", which this repo's CLAUDE.md does not
+carry). It now takes three relations: `delayMax: 0` reveals with no delay, `delayMax: 100` keeps the
+delay at or under 100 at the right edge (`left: 999` of 1000, where the delay is largest), and an
+element at `left: 800` reveals later than one at `left: 200`. This site's copy was older than the
+starter's and also pinned the defaults the starter had dropped: `translateY(50%)` in three tests,
+`2400ms` on the `--transition-fast-slow` curve, and a `100ms` read off the default `delayMax`, 400.
+Those go too, and "update is a no-op in viewport mode" now reveals the element, updates it, and
+checks its transition, opacity and transform are what they were, instead of reading `2400ms`.
+`src/lib/components/ProductListing.test.ts` counted every link on the listing (`toHaveLength(3)`);
+it now asserts exactly one `/products/<slug>` link per product, so an added back link passes and a
+product shown twice fails. `src/lib/slices/BluxCollection/BluxCollection.test.ts` scopes its anchor
+count to `.blux-collection__cards`, so a link outside the card list no longer reads as a card link.
+
+Every kept assertion was proved by mutation: the-pointe-burbank#55's 13 mutants, plus the eight its
+review-2 reviewer ran that its own list did not carry, 21 in all, 13 red and 8 surviving, every one
+as expected. The reds include a stagger read from the right edge, reversed, ignoring position, never
+written, or doubled (`2 * cfg.delayMax *`, 199.8ms at the right edge, caught by the `<= 100`
+relation once the bounded element sits at `left: 999`); a `delayMax` of 0 falling back to 400; a
+custom duration ignored; the hidden transform dropped; a viewport update that re-applies options or
+re-hides a revealed element (the observer has disconnected, so the content would stay invisible); a
+product in two groups; and a non-web card wrapped in an anchor. The survivors are design values or
+what the rewrites mean to allow: a `delayMax` clamped to 400, the default travel, duration, easing
+token name and stagger, a sub-category heading link, a "View all" link outside the cards, and the
+negative control, the position ratio written as `left * (1 / innerWidth)`.
