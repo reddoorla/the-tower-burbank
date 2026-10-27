@@ -71,7 +71,7 @@ cover the whole band (`relative`), and SplitFeature's image wrapping under the c
 `src/lib/blux/layout.browser.test.ts`: it renders the component with `svelte/server`, compiles
 `src/app.css` with Tailwind for exactly the classes in that markup, sets it in headless Chromium at
 1280 or 390px, and measures boxes. It asserts "the second cell overlaps the first vertically" and "the
-second cell starts below the first one's bottom", "computed opacity rises on hover to at least 0.9",
+second cell starts below the first one's bottom", "computed opacity on hover is at least 0.9",
 "the img's box lies inside its tile's box". No px or class in it. All five reviewer mutants turn it red, each in the
 test it was written for (8 of 8 with three more below), and it runs in about 12s.
 
@@ -94,10 +94,25 @@ of the shared workflow), which is what makes a browser-measured vitest file poss
 
 Review round 1 found that MediaText's `imageLeft` test had been rewritten to "the two variations'
 class lists differ", which passes when `imageLeft` puts the image on the right (`lg:order-3` for
-`lg:order-1`). Which side the image sits on is the editor's choice in the slice picker, so it is a
-client-visible behaviour, not one of the design values above. The browser file now renders both
+`lg:order-1`). Which side the image sits on is the editor's choice in the slice picker (for a lone
+section: `src/app.css` alternates even `media_text` sections inside `main` whatever the
+variation), so it is a client-visible behaviour, not one of the design values above. The browser file now renders both
 variations at 1280px and asserts the image ends before the copy starts (`imageLeft`) or starts
 after it ends (`imageRight`); the class comparison is gone. The same round loosened three of the
 file's own pins: the hover's exact `0` and `1` opacities, the crop's exact box equality, and exact
 `y` equality for cells on one row. Eight mutants red, and three design changes (a faint caption at
 rest, an 8px mat in the crop tile, a wider MediaText gutter) survive.
+
+Review round 2 found the gate no longer caught a homepage rendered without its stylesheet. Change
+FrozenPage's head to `styleTag(FROZEN_ENHANCE_CSS)` and the whole freeze CSS is gone: the page
+stacks to 25046px, which main's height band refused, and every test in this PR passed. The band is
+not coming back (it pins a height a designer may change); the spec now parses
+`the-pointe.style.css` itself, keeps the selectors that match the rendered markup, and requires at
+least one of them to be a live top-level rule of a stylesheet the document applies. The reviewer's
+mutant turns it red, and so does a subtler one this round's first draft missed: the freeze CSS
+present but wrapped in `@media print`, which a "the `<style>` contains the artifact" check let
+through because FROZEN_ENHANCE_CSS shares the tag. A 4000px taller page and a changed colour in the
+artifact both stay green. `FrozenPage.test.ts` now also asserts the style reaches `document.head`.
+The crop test's fixture is now a 100×300 data-URI SVG, since an aborted remote image has no
+intrinsic size and could not show an image escaping vertically without `h-full`; and the hover test
+keeps only the legibility floor, because how visible a caption is at rest is design.

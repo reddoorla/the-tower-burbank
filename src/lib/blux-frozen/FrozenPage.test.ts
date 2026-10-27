@@ -22,6 +22,9 @@ describe("FrozenPage", () => {
       "url('https://img.prismic.io/x.jpg')",
     );
     expect(container.innerHTML).not.toContain("⟦");
+    // The freeze's stylesheet lands in the head: without it the page renders
+    // unstyled and nothing else here would notice.
+    expect(document.head.innerHTML).toContain(".x{color:red}");
   });
 
   it("renders missing slots as empty without leaving a raw token", () => {
