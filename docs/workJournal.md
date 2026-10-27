@@ -70,9 +70,9 @@ cover the whole band (`relative`), and SplitFeature's image wrapping under the c
 (the `- 2%` gutter reserve). jsdom cannot lay anything out, so the keeps are a new vitest file,
 `src/lib/blux/layout.browser.test.ts`: it renders the component with `svelte/server`, compiles
 `src/app.css` with Tailwind for exactly the classes in that markup, sets it in headless Chromium at
-1280 or 390px, and measures boxes. It asserts "the second cell's top equals the first's" and "the
-second cell starts below the first one's bottom", "computed opacity is 1 after a hover", "the img's
-box equals its tile's box". No px or class in it. All five reviewer mutants turn it red, each in the
+1280 or 390px, and measures boxes. It asserts "the second cell overlaps the first vertically" and "the
+second cell starts below the first one's bottom", "computed opacity rises on hover to at least 0.9",
+"the img's box lies inside its tile's box". No px or class in it. All five reviewer mutants turn it red, each in the
 test it was written for (8 of 8 with three more below), and it runs in about 12s.
 
 The first version of the diff replaced the basis pins in Grid, BluxGrid, BluxSection and BluxCell with
@@ -91,3 +91,13 @@ The spec passes against a production build (`REDDOOR_GATE_SERVER=preview`,
 
 Surprise: CI gets Chromium before the unit tests (`playwright install` is step 11, `Test` step 13
 of the shared workflow), which is what makes a browser-measured vitest file possible here at all.
+
+Review round 1 found that MediaText's `imageLeft` test had been rewritten to "the two variations'
+class lists differ", which passes when `imageLeft` puts the image on the right (`lg:order-3` for
+`lg:order-1`). Which side the image sits on is the editor's choice in the slice picker, so it is a
+client-visible behaviour, not one of the design values above. The browser file now renders both
+variations at 1280px and asserts the image ends before the copy starts (`imageLeft`) or starts
+after it ends (`imageRight`); the class comparison is gone. The same round loosened three of the
+file's own pins: the hover's exact `0` and `1` opacities, the crop's exact box equality, and exact
+`y` equality for cells on one row. Eight mutants red, and three design changes (a faint caption at
+rest, an 8px mat in the crop tile, a wider MediaText gutter) survive.
