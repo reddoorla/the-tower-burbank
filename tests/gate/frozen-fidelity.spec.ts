@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 // Frozen-render contract gate. Drives the offline /dev/blux-frozen route (the
 // real the-pointe freeze artifacts rendered through the production <FrozenPage>)
 // and asserts the freeze's own class and id rules are applied on screen to
-// markup that carries those classes, every media background is baked, no
+// markup that carries every class and id the template does, every media background is baked, no
 // residual slot token survives, and nothing throws. Fonts + Blux-CDN source
 // images legitimately load from third-party hosts here (dev fixture); real
 // errors still fail via `pageerror`.
@@ -25,6 +25,12 @@ const freezeCss = readFileSync(
   new URL("../../src/routes/dev/blux-frozen/the-pointe.style.css", import.meta.url),
   "utf8",
 ).trim();
+// The freeze's tokenized template, the markup the route renders: the floor for
+// how much of the page must wear the artifact's classes and ids.
+const freezeHtml = readFileSync(
+  new URL("../../src/routes/dev/blux-frozen/the-pointe.html", import.meta.url),
+  "utf8",
+);
 
 test("frozen the-pointe render contract: stylesheet applied, backgrounds baked, slots substituted, no page errors", async ({
   page,
@@ -49,68 +55,100 @@ test("frozen the-pointe render contract: stylesheet applied, backgrounds baked, 
   // instead of the live layout) and throws nothing, so the evidence has to be
   // positive, and it has to come from the artifact's own vocabulary: generic
   // rules (`body`, `footer a`, `img`) match any page, so only rules whose every
-  // selector names a class or an id count. Three things must hold, none of
-  // them a height or a design value, because the test reads the same artifact
-  // the route renders and follows any edit to it:
-  // - the frozen markup carries the artifact's classes: most of its classed
-  //   elements wear a class some artifact rule names (a template and
-  //   stylesheet out of sync, or an enhance step that rewrites class
-  //   attributes, fails here);
+  // selector names a class or an id count. The floors come from the committed
+  // template itself, parsed here, never from the render, so a render that loses
+  // classes cannot lower its own bar. <FrozenPage> renders the template whole
+  // (it only substitutes slot tokens and rewrites hrefs), so these are
+  // structural, not design values, and follow any edit to the artifact pair.
+  // Four things must hold:
+  // - at least as many rendered elements wear an artifact class or id as
+  //   template elements do (renamed, stripped or truncated markup fails);
+  // - every artifact class and id appears on the page at least as often as in
+  //   the template (classes moved, merged or swapped for others fail even when
+  //   the element count still matches);
   // - some of those rules match the page;
-  // - every one that matches is a live top-level rule of a sheet the screen
-  //   applies: not disabled, and its `media` (and any `@import`'s) matching
-  //   via matchMedia, so `<style media="print">`, an `@media print` wrapper, a
-  //   dropped sheet and a truncated one all fail.
-  const applied = await page.evaluate((css) => {
-    const matches = (sel: string) => {
-      try {
-        return document.querySelector(sel) !== null;
-      } catch {
-        return false;
-      }
-    };
-    const own = new CSSStyleSheet();
-    own.replaceSync(css);
-    const named = [...own.cssRules]
-      .filter((r): r is CSSStyleRule => r instanceof CSSStyleRule)
-      .filter((r) => r.selectorText.split(",").every((part) => /[.#]-?[_a-zA-Z]/.test(part)));
-    const ownClasses = new Set(
-      named.flatMap((r) => [...r.selectorText.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)].map((m) => m[1])),
-    );
-    const classed = [...document.querySelectorAll("body [class]")];
-    const wearing = classed.filter((e) => [...e.classList].some((c) => ownClasses.has(c)));
-
-    const onScreen = (media: MediaList) =>
-      media.length === 0 || window.matchMedia(media.mediaText).matches;
-    const applies = (sheet: CSSStyleSheet) => {
-      for (let s: CSSStyleSheet | null = sheet; s; s = s.ownerRule?.parentStyleSheet ?? null) {
-        if (s.disabled || !onScreen(s.media)) return false;
-      }
-      return true;
-    };
-    const live = new Set(
-      [...document.styleSheets].filter(applies).flatMap((sheet) => {
+  // - every one that matches is a live rule of a sheet the screen applies: not
+  //   disabled and its `media` matching via matchMedia, walking into `@import`
+  //   sheets with each import's own media, so `<style media="print">`, an
+  //   `@media print` wrapper, an `@import ... print`, a dropped sheet and a
+  //   truncated one all fail.
+  const applied = await page.evaluate(
+    ({ css, html }) => {
+      const matches = (sel: string) => {
         try {
-          return [...sheet.cssRules]
-            .filter((r): r is CSSStyleRule => r instanceof CSSStyleRule)
-            .map((r) => r.selectorText);
+          return document.querySelector(sel) !== null;
+        } catch {
+          return false;
+        }
+      };
+      const own = new CSSStyleSheet();
+      own.replaceSync(css);
+      const named = [...own.cssRules]
+        .filter((r): r is CSSStyleRule => r instanceof CSSStyleRule)
+        .filter((r) => r.selectorText.split(",").every((part) => /[.#]-?[_a-zA-Z]/.test(part)));
+      const tokens = (re: RegExp) =>
+        new Set(named.flatMap((r) => [...r.selectorText.matchAll(re)].map((m) => m[1])));
+      const ownClasses = tokens(/\.(-?[_a-zA-Z][\w-]*)/g);
+      const ownIds = tokens(/#(-?[_a-zA-Z][\w-]*)/g);
+
+      // Every artifact class or id an element wears, as `.c` / `#i` tokens.
+      const worn = (e: Element) => [
+        ...[...e.classList].filter((c) => ownClasses.has(c)).map((c) => `.${c}`),
+        ...(ownIds.has(e.id) ? [`#${e.id}`] : []),
+      ];
+      const census = (root: Element) => {
+        const counts = new Map<string, number>();
+        let wearing = 0;
+        for (const e of root.querySelectorAll("*")) {
+          const w = worn(e);
+          if (w.length > 0) wearing++;
+          for (const t of w) counts.set(t, (counts.get(t) ?? 0) + 1);
+        }
+        return { wearing, counts };
+      };
+      const expected = census(new DOMParser().parseFromString(html, "text/html").body);
+      const rendered = census(document.body);
+      const short = [...expected.counts]
+        .filter(([t, n]) => (rendered.counts.get(t) ?? 0) < n)
+        .map(([t, n]) => `${t} ${rendered.counts.get(t) ?? 0}/${n}`);
+
+      const onScreen = (media: MediaList) =>
+        media.length === 0 || window.matchMedia(media.mediaText).matches;
+      const liveRules = (sheet: CSSStyleSheet | null): string[] => {
+        if (!sheet || sheet.disabled || !onScreen(sheet.media)) return [];
+        try {
+          return [...sheet.cssRules].flatMap((r) =>
+            r instanceof CSSImportRule
+              ? onScreen(r.media)
+                ? liveRules(r.styleSheet)
+                : []
+              : r instanceof CSSStyleRule
+                ? [r.selectorText]
+                : [],
+          );
         } catch {
           return []; // a cross-origin font sheet
         }
-      }),
-    );
-    const onPage = named.filter((r) => matches(r.selectorText));
-    return {
-      classed: classed.length,
-      wearing: wearing.length,
-      onPage: onPage.length,
-      notLive: onPage.filter((r) => !live.has(r.selectorText)).map((r) => r.selectorText),
-    };
-  }, freezeCss);
+      };
+      const live = new Set([...document.styleSheets].flatMap(liveRules));
+      const onPage = named.filter((r) => matches(r.selectorText));
+      return {
+        templateWearing: expected.wearing,
+        wearing: rendered.wearing,
+        short,
+        onPage: onPage.length,
+        notLive: onPage.filter((r) => !live.has(r.selectorText)).map((r) => r.selectorText),
+      };
+    },
+    { css: freezeCss, html: freezeHtml },
+  );
   expect(
-    applied.wearing * 2,
-    `${applied.wearing} of ${applied.classed} classed elements wear an artifact class`,
-  ).toBeGreaterThan(applied.classed);
+    applied.wearing,
+    `rendered elements wearing an artifact class or id (the template has ${applied.templateWearing})`,
+  ).toBeGreaterThanOrEqual(applied.templateWearing);
+  expect(applied.short, "artifact classes and ids worn less often than in the template").toEqual(
+    [],
+  );
   expect(applied.onPage, "artifact rules naming a class or id that match the page").toBeGreaterThan(
     0,
   );
