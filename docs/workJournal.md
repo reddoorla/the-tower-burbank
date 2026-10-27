@@ -51,7 +51,7 @@ down; this branch is cut from the local HEAD, so that commit is absent from it.
 Two stale Renovate branches survive on the remote (`renovate/all-minor-patch`,
 `renovate/jsdom-30.x`) with no open PR behind either.
 
-## 2026-10-27 — Unit tests stop pinning Blux class lists; layout is measured in a browser (#TBD)
+## 2026-10-27 — Unit tests stop pinning Blux class lists; layout is measured in a browser (#38)
 
 The fleet test audit (reddoorla/reddoor-workspace `audits/2026-10-26-fleet-test-audit/report.md`)
 held every unit assertion in this repo to the starter's "Tests build; they don't freeze" rule.
