@@ -75,11 +75,11 @@ second cell starts below the first one's bottom", "computed opacity is 1 after a
 box equals its tile's box". No px or class in it. All five reviewer mutants turn it red, each in the
 test it was written for (8 of 8 with three more below), and it runs in about 12s.
 
-The first version of the diff replaced the basis pins in Grid, BluxGrid and BluxCell with
+The first version of the diff replaced the basis pins in Grid, BluxGrid, BluxSection and BluxCell with
 `toBe(rowCellBases(cells))` and `toBe(gridCellBasis(...))`. A reviewer caught that those compare the
 helper with itself, so a broken reserve passes. They are gone; the browser file asserts the outcome
-instead (four cards on the first line of a cols=4 grid, two BluxGrid cells on one row at desktop and
-stacked on a phone), with three extra mutants proving it: no reserve in `rowCellBases`, none in
+instead (four cards on the first line of a cols=4 grid, two BluxGrid or BluxSection cells on one row at
+desktop and stacked on a phone), with three extra mutants proving it: no reserve in `rowCellBases`, none in
 `gridCellBasis`, and `.blux-cell` keeping its desktop basis on a phone. All three red.
 
 `tests/gate/frozen-fidelity.spec.ts` loses its 15000–15700px page-height band and the 500ms sleep

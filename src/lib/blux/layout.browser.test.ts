@@ -20,6 +20,7 @@ import { chromium, type Browser, type Page } from "@playwright/test";
 import Grid from "./Grid.svelte";
 import SplitFeature from "$lib/slices/SplitFeature/index.svelte";
 import BluxGrid from "$lib/slices/BluxGrid/index.svelte";
+import BluxSection from "$lib/slices/BluxSection/index.svelte";
 import type { Presentation, RenderNode } from "./presentation";
 
 const require = createRequire(import.meta.url);
@@ -152,6 +153,31 @@ describe("BluxGrid slice layout (browser)", () => {
     const [a, b] = await boxes(page, ".blux-grid__cells > .blux-cell");
     expect(b.y).toBeGreaterThanOrEqual(a.y + a.height);
     await page.close();
+  });
+});
+
+const twoCellSection = {
+  slice_type: "blux_section",
+  variation: "default",
+  primary: {
+    cells: [
+      { kind: "text", title: rt("heading3", "A"), subgrid: [] },
+      { kind: "text", title: rt("heading3", "B"), subgrid: [] },
+    ],
+  },
+};
+
+describe("BluxSection slice layout (browser)", () => {
+  it("two cells share one row on desktop and stack on a phone", async () => {
+    const desk = await show(html(BluxSection, { slice: twoCellSection }), DESKTOP);
+    const [a, b] = await boxes(desk, ".blux-section__cells > .blux-cell");
+    expect(b.y).toBe(a.y);
+    expect(b.x).toBeGreaterThanOrEqual(a.x + a.width);
+    await desk.close();
+    const phone = await show(html(BluxSection, { slice: twoCellSection }), PHONE);
+    const [c, d] = await boxes(phone, ".blux-section__cells > .blux-cell");
+    expect(d.y).toBeGreaterThanOrEqual(c.y + c.height);
+    await phone.close();
   });
 });
 
