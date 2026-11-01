@@ -101,13 +101,13 @@ export const FROZEN_ENHANCE_CSS = [
   //    the last link's 10px right margin ran about 9px past the edge (the page
   //    was 1033px at 1024); the "Contact Us" text itself stayed on screen.
   //    Let that third keep its content's width; the empty centre third gives
-  //    way. The links move left by up to 25px in that band (about 9px at
-  //    1080); from about 1090px, where a third is wide enough, nothing moves.
+  //    way. The links move left by up to 25px in that band (2px at 1100);
+  //    from about 1110px, where a third is wide enough, nothing moves.
   ".navigation0row>.navigation0right{min-width:max-content}",
   // 2. Above 700px `.text2` is 70px, and the third line, "beautiful" (5.94em,
   //    416px), starts about 55% of the way across the screen, so from 701 to
   //    about 930px it ran past the edge (838px at 768). 7.2vw keeps the word
-  //    on screen with room for a 15px scrollbar, and is 70px from 972px up, so
+  //    on screen with room for a 15px scrollbar, and is 70px from 973px up, so
   //    wider screens are untouched. Sized for "beautiful": a longer word put in
   //    this Prismic slot would need a smaller factor. Limited to the range where
   //    `.text2` is 70px, so the 40px phone size is never enlarged.
