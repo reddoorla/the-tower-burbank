@@ -229,3 +229,16 @@ Both fixes are render-time rules in `FROZEN_ENHANCE_CSS`, so the artifact stays 
 **Tried and abandoned: sizing the heading against its column** (`container-type` on the column and `min(70px, 16.5cqi)`), which is MSOT's pattern. Review round 1 measured it shrinking the heading to 63px at 1024, where it already fit on screen: the column was narrower than the word up to about 1130px, but only the screen edge mattered. 7.2vw follows the room the word actually has: it is 70px from 973px up, and leaves space for a 15px desktop scrollbar (7.4vw fit with only about 5px of slack, and a real scrollbar would eat that).
 
 `tests/smoke/mobile-overflow.spec.ts` checks `/` and `/contact` at 320, 390, 768, 820, 1024 and 1050. Reverting either rule turns it red, on both runs: the nav rule at 820, 1024 and 1050; the heading rule at 768 and 820. Its cut-text check depends on reduced motion: with motion allowed, the frozen reveal holds below-the-fold text at opacity 0 at load, and the visibility check would skip it. The spec now sets that itself instead of inheriting it from `playwright.config.ts`.
+
+**P1-90d: the shared `measure()` moved on.** Rounds 3 and 4 of the Williamson review (reddoorla/williamson-construction-co#46) found more holes in `seen()`, each reproduced on a blank-page fixture against a paint test. The fixes:
+
+- backdrop-filter, preserve-3d and content-visibility now form containing blocks;
+- clip-path and mask-image clip, on every ancestor;
+- a text-overflow ellipsis ends the line, but only on the line's own block container;
+- plain inline boxes no longer clip;
+- clipping uses the padding box;
+- a line must be on screen at both edges;
+- open shadow roots and slots are walked;
+- text inside an `inert` subtree (a carousel's peeking slide) is skipped.
+
+The spec here takes the same function. None of those patterns is on this site's routes. All three of this PR's mutations still behave as recorded: the nav rule reverted is red at 820, 1024 and 1050; the heading rule reverted is red at 768 and 820 (839 and 868px); and the heading cut with its width hidden is red on "text cut off" at 768 and 820. Each was run twice, and the branch passes 12 of 12.
