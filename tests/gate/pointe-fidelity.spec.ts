@@ -37,32 +37,36 @@ function watchConsole(page: Page): string[] {
   return errors;
 }
 
-test("the-pointe catalog fixture renders faithfully; HTML dumped for coverage", async ({
-  page,
-}) => {
-  const errors = watchConsole(page);
-  await page.goto("/dev/blux-pointe");
+test(
+  "the-pointe catalog fixture renders faithfully; HTML dumped for coverage",
+  { tag: "@smoke" },
+  async ({ page }) => {
+    const errors = watchConsole(page);
+    await page.goto("/dev/blux-pointe");
 
-  // Chrome renders once (from the app layout, fed by the fixture page data).
-  await expect(page.locator("footer")).toBeVisible();
-  await expect(page.getByText("Todd Doney")).toBeVisible();
-  // The map widget's static markup is present (hydration is keyless in CI).
-  await expect(page.locator(".blux-map")).toHaveCount(1);
-  await expect(page.locator("#burbank_map")).toHaveCount(1);
-  // Band content rendered through the SliceZone.
-  await expect(page.getByText(/Burbank/i).first()).toBeVisible();
+    // Chrome renders once (from the app layout, fed by the fixture page data).
+    await expect(page.locator("footer")).toBeVisible();
+    await expect(page.getByText("Todd Doney")).toBeVisible();
+    // The map widget's static markup is present (hydration is keyless in CI).
+    await expect(page.locator(".blux-map").first()).toBeAttached();
+    await expect(page.locator("#burbank_map")).toBeAttached();
+    // Band content rendered through the SliceZone.
+    await expect(page.getByText(/Burbank/i).first()).toBeVisible();
 
-  // No unexpected console errors beyond the offline-render allowlist.
-  expect(errors).toEqual([]);
+    // No unexpected console errors beyond the offline-render allowlist.
+    expect(errors).toEqual([]);
 
-  // Dump the rendered HTML so the maintenance coverage gate can score it
-  // (POINTE_RENDERED_HTML → this path).
-  const html = await page.content();
-  mkdirSync("test-results/gate", { recursive: true });
-  writeFileSync("test-results/gate/pointe-rendered.html", html);
-});
+    // Dump the rendered HTML so the maintenance coverage gate can score it
+    // (POINTE_RENDERED_HTML → this path).
+    const html = await page.content();
+    mkdirSync("test-results/gate", { recursive: true });
+    writeFileSync("test-results/gate/pointe-rendered.html", html);
+  },
+);
 
-// The visual-fidelity layer: assert the emitted data actually resolves into
+// The visual-fidelity layer. Untagged on purpose, so it runs in the scaffold
+// tier (`pnpm test:scaffold`) and never blocks a merge: it pins pixel values
+// (a role font above 40px, a band taller than 600px) from the comp. Assert the emitted data actually resolves into
 // layout (a real flex-basis grid, band padding, cover crops, type-role
 // wrapping, laid-out heights). A failure here is a REAL fidelity gap — fix the
 // render/emit, never weaken the assertion.

@@ -193,7 +193,7 @@ for (const width of WIDTHS) {
     test.use({ viewport: { width, height: 800 }, reducedMotion: "reduce" });
 
     for (const path of ROUTES) {
-      test(`${path} has no horizontal overflow`, async ({ page }) => {
+      test(`${path} has no horizontal overflow`, { tag: "@smoke" }, async ({ page }) => {
         await gotoLoaded(page, path);
         const { scrollWidth, clientWidth, cut } = await measure(page);
         expect(scrollWidth, `page is wider than ${clientWidth}px`).toBeLessThanOrEqual(clientWidth);
