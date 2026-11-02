@@ -94,4 +94,22 @@ export const FROZEN_ENHANCE_CSS = [
   // original .25s transition still animates the plus→minus collapse.
   ".map_icon_plusm:before{top:calc(50% - 7px);height:14px}",
   '.map_icon[data-clicked="1"] .map_icon_plusm:before{top:50%;height:0}',
+  // P1-90: two places the page was wider than the screen. Both are faithful to
+  // the original Blux site, which overflows the same way.
+  // 1. The desktop nav (above 800px) splits its row into equal thirds, and the
+  //    right third's four nowrap links need 363px. From 801 to about 1060px
+  //    the last link's 10px right margin ran about 9px past the edge (the page
+  //    was 1033px at 1024); the "Contact Us" text itself stayed on screen.
+  //    Let that third keep its content's width; the empty centre third gives
+  //    way. The links move left by up to 25px in that band (2px at 1100);
+  //    from about 1110px, where a third is wide enough, nothing moves.
+  ".navigation0row>.navigation0right{min-width:max-content}",
+  // 2. Above 700px `.text2` is 70px, and the third line, "beautiful" (5.94em,
+  //    416px), starts about 55% of the way across the screen, so from 701 to
+  //    about 930px it ran past the edge (838px at 768). 7.2vw keeps the word
+  //    on screen with room for a 15px scrollbar, and is 70px from 973px up, so
+  //    wider screens are untouched. Sized for "beautiful": a longer word put in
+  //    this Prismic slot would need a smaller factor. Limited to the range where
+  //    `.text2` is 70px, so the 40px phone size is never enlarged.
+  "@media not all and (max-width:700px){#page-block-5-item-1 .text2{font-size:min(70px,7.2vw)}}",
 ].join("");
