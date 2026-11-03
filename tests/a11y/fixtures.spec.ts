@@ -15,6 +15,9 @@ for (const { path, name } of pages) {
     // is also the correct a11y baseline (motion-averse users see this state).
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(path);
+    // Scan after hydration: components that build or change their DOM in
+    // script would otherwise be audited in their server-rendered state.
+    await page.locator("html[data-hydrated]").waitFor({ state: "attached" });
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
       .analyze();

@@ -30,6 +30,9 @@ async function gotoLoaded(page: Page, path: string) {
   const res = await page.goto(path, { waitUntil: "load" });
   // An unpublished page would otherwise measure the error page and pass.
   expect(res?.ok(), `${path} answered ${res?.status()}`).toBe(true);
+  // On vite dev, `load` fires before the client has run: the overflow the
+  // page's own onMount makes would not be on the screen yet.
+  await page.locator("html[data-hydrated]").waitFor({ state: "attached" });
   await page.evaluate(() => document.fonts.ready);
 }
 

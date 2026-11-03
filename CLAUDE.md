@@ -23,8 +23,10 @@ The Playwright suite is tiered by what a red _means_, as in `reddoor-starter`'s
 CLAUDE.md "Tests build; they don't freeze". A test tagged `{ tag: "@smoke" }` is
 a contract and gates every merge through `pnpm test:smoke`
 (`playwright test --grep @smoke`): no fixed sleeps, no pixel or colour values,
-no exact counts a new element would change, and anything that interacts waits on
-a hydration marker (CI runs `vite dev`, where `load` fires before hydration).
+no exact counts a new element would change, and a test that interacts, or reads
+what script builds (the console, the layout, the accessibility tree), waits on
+`html[data-hydrated]` (set in the root layout's `onMount`). CI runs `vite dev`,
+where `load` fires before hydration.
 Geometry and comp-fidelity specs stay untagged and run on demand with
 `pnpm test:scaffold`; `pnpm test:nightly` runs `@nightly` specs (none today, so
 there is no nightly workflow); `pnpm test:e2e` runs everything. A human's design
