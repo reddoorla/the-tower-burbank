@@ -1,6 +1,5 @@
 import { test, expect, type ConsoleMessage } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { onlySvelteImageReplayHandlers, uncoveredErrors } from "./csp-console";
 
 // Frozen-render contract gate. Drives the offline /dev/blux-frozen route (the
 // real the-pointe freeze artifacts rendered through the production <FrozenPage>)
@@ -43,7 +42,12 @@ test(
   async ({ page }) => {
     const errors: string[] = [];
     page.on("console", (m: ConsoleMessage) => {
-      if (m.type() === "error" && !allowed(m.text()) && !allowed(m.location()?.url ?? "")) {
+      const csp = /violates the following Content Security Policy/.test(m.text());
+      if (
+        m.type() === "error" &&
+        !allowed(m.text()) &&
+        (csp || !allowed(m.location()?.url ?? ""))
+      ) {
         errors.push(`[console.error] ${m.text()}`);
       }
     });
@@ -51,13 +55,7 @@ test(
       if (!allowed(e.message)) errors.push(e.message);
     });
 
-    const res = await page.goto("/dev/blux-frozen", { waitUntil: "load" });
-    // Svelte's hydration removes its replay handlers, so the live DOM cannot show
-    // what the server sent: the excuse also needs the server HTML to carry only them.
-    const ssr = (await res?.text()) ?? "";
-    const ssrReplayOnly = [...ssr.matchAll(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi)].every(
-      (m) => m[1] === '"this.__e=event"',
-    );
+    await page.goto("/dev/blux-frozen", { waitUntil: "load" });
     // `load` fires before hydration on vite dev; the console must be read after it.
     await page.locator("html[data-hydrated]").waitFor({ state: "attached" });
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
@@ -174,7 +172,9 @@ test(
           notLive: onPage.filter((r) => !live.has(r.selectorText)).map((r) => r.selectorText),
         };
       },
-      { css: freezeCss, html: freezeHtml },
+      // Parsed with its inline handlers removed: a DOMParser parse runs under the
+      // page's CSP, and the template's font-link onload would log a violation.
+      { css: freezeCss, html: freezeHtml.replace(/\son[a-z]+="[^"]*"/gi, "") },
     );
     expect(
       applied.wearing,
@@ -208,8 +208,6 @@ test(
 
     // No residual slot token survived substitution.
     expect(await page.content()).not.toContain("⟦");
-    expect(
-      uncoveredErrors(errors, ssrReplayOnly && (await onlySvelteImageReplayHandlers(page))),
-    ).toEqual([]);
+    expect(errors).toEqual([]);
   },
 );

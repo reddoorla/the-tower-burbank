@@ -28,7 +28,10 @@ function attachConsoleWatcher(page: Page, extraAllowed: RegExp[] = []) {
     if (msg.type() !== "error") return;
     const text = msg.text();
     const url = msg.location()?.url ?? "";
-    if (isAllowed(text) || isAllowed(url)) return;
+    // A CSP violation is judged on its text alone: its location is the module
+    // that triggered the load (e.g. /src/lib/utils/vimeo.ts), never the noise.
+    const csp = /violates the following Content Security Policy/.test(text);
+    if (!csp && (isAllowed(text) || isAllowed(url))) return;
     errors.push(`[console.error] ${text}${url ? ` (${url})` : ""}`);
   });
 

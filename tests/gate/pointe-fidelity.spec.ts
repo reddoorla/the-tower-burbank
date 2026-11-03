@@ -32,14 +32,19 @@ function watchConsole(page: Page): string[] {
     if (!s) return false;
     const csp = s.match(/^[^']*'([^']*)'[^']*violates the following Content Security Policy/);
     if (/violates the following Content Security Policy/.test(s))
-      return !!csp && /^https:\/\/[\w-]+\.cloudfront\.net\//.test(csp[1]);
+      return (
+        !!csp &&
+        /^Loading (the image|media from)\s/.test(s) &&
+        /^https:\/\/[\w-]+\.cloudfront\.net\//.test(csp[1])
+      );
     return ALLOWED_CONSOLE.some((re) => re.test(s));
   };
   page.on("console", (m: ConsoleMessage) => {
     if (m.type() !== "error") return;
     const text = m.text();
     const url = m.location()?.url ?? "";
-    if (allowed(text) || allowed(url)) return;
+    const csp = /violates the following Content Security Policy/.test(text);
+    if (allowed(text) || (!csp && allowed(url))) return;
     errors.push(`[console.error] ${text}${url ? ` (${url})` : ""}`);
   });
   page.on("pageerror", (e) => {
