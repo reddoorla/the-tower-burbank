@@ -47,6 +47,8 @@ test(
     });
 
     await page.goto("/dev/blux-frozen", { waitUntil: "load" });
+    // `load` fires before hydration on vite dev; the console must be read after it.
+    await page.locator("html[data-hydrated]").waitFor({ state: "attached" });
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     // Wait for web fonts to settle (they drive text height) rather than a blind sleep.
     await page.evaluate(() => document.fonts.ready.then(() => undefined));
@@ -178,16 +180,17 @@ test(
     ).toBeGreaterThan(0);
     expect(applied.notLive, "matching artifact rules the screen does not apply").toEqual([]);
 
-    // Every background the template declares is baked as an inline declaration:
-    // a freeze that stops baking them leaves every band photo blank and throws no
-    // page error. The bar is the template's own count of `background-image`
-    // declarations, not a number written here.
+    // Every background the template declares is baked as an inline declaration
+    // with a non-empty url: a freeze that stops baking them, or bakes `url("")`,
+    // leaves every band photo blank and throws no page error. The bar is the
+    // template's own count of `background-image` declarations, not a number
+    // written here.
     const templateBackgrounds = (freezeHtml.match(/background-image/g) ?? []).length;
     expect(templateBackgrounds).toBeGreaterThan(0);
     const backgrounds = await page.evaluate(
       () =>
         [...document.querySelectorAll<HTMLElement>("*")].filter((e) =>
-          /url\(/.test(e.style.backgroundImage),
+          /url\("[^"]+"\)/.test(e.style.backgroundImage),
         ).length,
     );
     expect(backgrounds).toBeGreaterThanOrEqual(templateBackgrounds);

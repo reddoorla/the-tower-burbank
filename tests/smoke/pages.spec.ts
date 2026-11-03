@@ -60,6 +60,9 @@ for (const route of smokeRoutes) {
           `hydration marker "${route.hydrationMarker}" on ${route.path}`,
         ).toBeVisible();
       }
+      // `footer` is server-rendered, so it proves the render, not hydration: wait
+      // for the client to be live before reading the console.
+      await page.locator("html[data-hydrated]").waitFor({ state: "attached" });
       expect(errors, `console errors on ${route.path}`).toEqual([]);
     },
   );
@@ -75,5 +78,6 @@ test("404 page renders the custom error component", { tag: "@smoke" }, async ({ 
   expect(response?.status()).toBe(404);
   // src/routes/+error.svelte renders `<h1>{page.status}</h1>` → "404".
   await expect(page.getByText("404", { exact: false }).first()).toBeVisible();
+  await page.locator("html[data-hydrated]").waitFor({ state: "attached" });
   expect(errors).toEqual([]);
 });

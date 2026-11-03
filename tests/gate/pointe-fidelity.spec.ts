@@ -53,7 +53,9 @@ test(
     // Band content rendered through the SliceZone.
     await expect(page.getByText(/Burbank/i).first()).toBeVisible();
 
-    // No unexpected console errors beyond the offline-render allowlist.
+    // No unexpected console errors beyond the offline-render allowlist, read
+    // once the client has hydrated.
+    await page.locator("html[data-hydrated]").waitFor({ state: "attached" });
     expect(errors).toEqual([]);
 
     // Dump the rendered HTML so the maintenance coverage gate can score it
@@ -66,9 +68,9 @@ test(
 
 // The visual-fidelity layer. Untagged on purpose, so it runs in the scaffold
 // tier (`pnpm test:scaffold`) and never blocks a merge: it pins pixel values
-// (a role font above 40px, a band taller than 600px) from the comp. Assert the emitted data actually resolves into
-// layout (a real flex-basis grid, band padding, cover crops, type-role
-// wrapping, laid-out heights). A failure here is a REAL fidelity gap — fix the
+// (a role font above 40px, a band taller than 600px) from the comp.
+// Assert the emitted data actually resolves into layout (a real flex-basis grid,
+// band padding, cover crops, type-role wrapping, laid-out heights). A failure here is a REAL fidelity gap — fix the
 // render/emit, never weaken the assertion.
 test("catalog visual layer resolves grid, cover, padding, and type roles", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
