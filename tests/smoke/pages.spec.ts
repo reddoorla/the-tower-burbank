@@ -16,7 +16,13 @@ const ALLOWED_CONSOLE_PATTERNS: RegExp[] = [
 function attachConsoleWatcher(page: Page, extraAllowed: RegExp[] = []) {
   const errors: string[] = [];
   const allowed = [...ALLOWED_CONSOLE_PATTERNS, ...extraAllowed];
-  const isAllowed = (s: string) => !!s && allowed.some((re) => re.test(s));
+  // A CSP report quotes the whole policy, which names vimeo and Turnstile:
+  // match only what was blocked, never the policy text.
+  const isAllowed = (s: string) =>
+    !!s &&
+    allowed.some((re) =>
+      re.test(s.replace(/violates the following Content Security Policy[\s\S]*$/, "")),
+    );
 
   page.on("console", (msg: ConsoleMessage) => {
     if (msg.type() !== "error") return;

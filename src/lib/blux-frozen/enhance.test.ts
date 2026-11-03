@@ -4,6 +4,7 @@ import {
   decodeCfEmail,
   rewriteCfEmails,
   enhanceFrozenHtml,
+  stripNoopFontOnload,
   FROZEN_ENHANCE_CSS,
 } from "./enhance";
 
@@ -50,7 +51,30 @@ describe("rewriteCfEmails", () => {
   });
 });
 
+describe("stripNoopFontOnload", () => {
+  it("drops the blocked no-op onload from the font link and keeps the link", () => {
+    const html =
+      '<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Montserrat" media="all" as="style" onload="this.rel=\'stylesheet\'">';
+    const out = stripNoopFontOnload(html);
+    expect(out).not.toContain("onload");
+    expect(out).toContain('rel="stylesheet"');
+    expect(out).toContain('href="https://fonts.googleapis.com/css?family=Montserrat"');
+  });
+
+  it("leaves other inline handlers alone", () => {
+    const html = '<button onclick="go()">x</button>';
+    expect(stripNoopFontOnload(html)).toBe(html);
+  });
+});
+
 describe("enhanceFrozenHtml + css", () => {
+  it("removes the font link's no-op onload on the way out", () => {
+    const out = enhanceFrozenHtml(
+      '<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=M" onload="this.rel=\'stylesheet\'">',
+    );
+    expect(out).not.toContain("onload");
+  });
+
   it("applies both repairs", () => {
     const html =
       '<a class="data-hashlink" href="/#5">Nav</a>' +

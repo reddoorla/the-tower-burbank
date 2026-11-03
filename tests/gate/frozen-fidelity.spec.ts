@@ -1,5 +1,6 @@
 import { test, expect, type ConsoleMessage } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { onlySvelteImageReplayHandlers, uncoveredErrors } from "./csp-console";
 
 // Frozen-render contract gate. Drives the offline /dev/blux-frozen route (the
 // real the-pointe freeze artifacts rendered through the production <FrozenPage>)
@@ -13,7 +14,12 @@ const ALLOWED_CONSOLE: RegExp[] = [
   /fonts\.g(oogleapis|static)\.com/i,
   /vimeo/i,
 ];
-const allowed = (s: string) => ALLOWED_CONSOLE.some((re) => re.test(s));
+// A CSP report quotes the whole policy, which names vimeo: match only what was
+// blocked, never the policy text.
+const allowed = (s: string) =>
+  ALLOWED_CONSOLE.some((re) =>
+    re.test(s.replace(/violates the following Content Security Policy[\s\S]*$/, "")),
+  );
 
 // The freeze settles + bakes the export's layout at a 1440px viewport; render
 // it at that same width.
@@ -39,7 +45,7 @@ test(
     const errors: string[] = [];
     page.on("console", (m: ConsoleMessage) => {
       if (m.type() === "error" && !allowed(m.text()) && !allowed(m.location()?.url ?? "")) {
-        errors.push(m.text());
+        errors.push(`[console.error] ${m.text()}`);
       }
     });
     page.on("pageerror", (e) => {
@@ -197,6 +203,6 @@ test(
 
     // No residual slot token survived substitution.
     expect(await page.content()).not.toContain("⟦");
-    expect(errors).toEqual([]);
+    expect(uncoveredErrors(errors, await onlySvelteImageReplayHandlers(page))).toEqual([]);
   },
 );

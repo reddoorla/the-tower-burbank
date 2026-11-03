@@ -1,5 +1,6 @@
 import { test, expect, type Page, type ConsoleMessage } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { onlySvelteImageReplayHandlers, uncoveredErrors } from "./csp-console";
 
 // Plan 4d fidelity gate. Drives the offline /dev/blux-pointe route (the real
 // the-pointe catalog fixture rendered through the production SliceZone + chrome)
@@ -23,7 +24,13 @@ const ALLOWED_CONSOLE: RegExp[] = [
 
 function watchConsole(page: Page): string[] {
   const errors: string[] = [];
-  const allowed = (s: string) => !!s && ALLOWED_CONSOLE.some((re) => re.test(s));
+  // A CSP report quotes the whole policy, which names vimeo and Turnstile:
+  // match only what was blocked, never the policy text.
+  const allowed = (s: string) =>
+    !!s &&
+    ALLOWED_CONSOLE.some((re) =>
+      re.test(s.replace(/violates the following Content Security Policy[\s\S]*$/, "")),
+    );
   page.on("console", (m: ConsoleMessage) => {
     if (m.type() !== "error") return;
     const text = m.text();
@@ -56,7 +63,7 @@ test(
     // No unexpected console errors beyond the offline-render allowlist, read
     // once the client has hydrated.
     await page.locator("html[data-hydrated]").waitFor({ state: "attached" });
-    expect(errors).toEqual([]);
+    expect(uncoveredErrors(errors, await onlySvelteImageReplayHandlers(page))).toEqual([]);
 
     // Dump the rendered HTML so the maintenance coverage gate can score it
     // (POINTE_RENDERED_HTML → this path).
