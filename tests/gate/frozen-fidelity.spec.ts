@@ -14,12 +14,11 @@ const ALLOWED_CONSOLE: RegExp[] = [
   /fonts\.g(oogleapis|static)\.com/i,
   /vimeo/i,
 ];
-// A CSP report quotes the whole policy, which names vimeo: match only what was
-// blocked, never the policy text.
+// A CSP violation is never noise, whatever host it names: a blocked load from an
+// allowlisted host is still a dead feature. Only non-CSP messages are matched.
 const allowed = (s: string) =>
-  ALLOWED_CONSOLE.some((re) =>
-    re.test(s.replace(/violates the following Content Security Policy[\s\S]*$/, "")),
-  );
+  !/violates the following Content Security Policy/.test(s) &&
+  ALLOWED_CONSOLE.some((re) => re.test(s));
 
 // The freeze settles + bakes the export's layout at a 1440px viewport; render
 // it at that same width.
@@ -52,7 +51,13 @@ test(
       if (!allowed(e.message)) errors.push(e.message);
     });
 
-    await page.goto("/dev/blux-frozen", { waitUntil: "load" });
+    const res = await page.goto("/dev/blux-frozen", { waitUntil: "load" });
+    // Svelte's hydration removes its replay handlers, so the live DOM cannot show
+    // what the server sent: the excuse also needs the server HTML to carry only them.
+    const ssr = (await res?.text()) ?? "";
+    const ssrReplayOnly = [...ssr.matchAll(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi)].every(
+      (m) => m[1] === '"this.__e=event"',
+    );
     // `load` fires before hydration on vite dev; the console must be read after it.
     await page.locator("html[data-hydrated]").waitFor({ state: "attached" });
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
@@ -203,6 +208,8 @@ test(
 
     // No residual slot token survived substitution.
     expect(await page.content()).not.toContain("⟦");
-    expect(uncoveredErrors(errors, await onlySvelteImageReplayHandlers(page))).toEqual([]);
+    expect(
+      uncoveredErrors(errors, ssrReplayOnly && (await onlySvelteImageReplayHandlers(page))),
+    ).toEqual([]);
   },
 );

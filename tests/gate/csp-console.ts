@@ -8,12 +8,15 @@ import type { Page } from "@playwright/test";
 // the production CSP logs "Executing inline event handler violates ..." for
 // each one (it blocks inline handlers; hashes do not cover them). Svelte's
 // replay of pre-hydration image events is blocked as a result. Follow-up issue:
-// filed by the operator (CSP vs. Svelte image replay on catalog-rendered routes).
+// the-tower-burbank#44 (CSP vs. Svelte image replay on catalog-rendered routes).
 //
-// The excuse applies only when, after hydration, every element's on* attributes
-// are exactly that replay handler. Any other inline handler, on any element,
-// means the errors count. Blocked scripts ("Loading the script ... violates")
-// never match the prefix and are never excused.
+// Svelte's replay_events removes its handlers from the live DOM after hydration,
+// so the live DOM alone cannot show what the server sent. The excuse applies only
+// when both hold: the server HTML (checked by the caller) carries only that replay
+// handler, and after hydration every element's on* attributes are exactly that
+// handler too. Any other inline handler, in either view, means the errors count.
+// Blocked scripts ("Loading the script ... violates") never match the prefix and
+// are never excused.
 export const CSP_INLINE_PREFIX =
   "Executing inline event handler violates the following Content Security Policy";
 

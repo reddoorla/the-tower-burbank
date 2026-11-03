@@ -24,13 +24,17 @@ const ALLOWED_CONSOLE: RegExp[] = [
 
 function watchConsole(page: Page): string[] {
   const errors: string[] = [];
-  // A CSP report quotes the whole policy, which names vimeo and Turnstile:
-  // match only what was blocked, never the policy text.
-  const allowed = (s: string) =>
-    !!s &&
-    ALLOWED_CONSOLE.some((re) =>
-      re.test(s.replace(/violates the following Content Security Policy[\s\S]*$/, "")),
-    );
+  // A CSP violation is never noise, whatever host it names. The one exception is
+  // the export CDN: the fixture's export images and its .mp4 come from cloudfront,
+  // which the policy does not list. Only a blocked cloudfront URL is allowed;
+  // other CSP messages (inline handlers, a blocked Vimeo script) fall through.
+  const allowed = (s: string) => {
+    if (!s) return false;
+    const csp = s.match(/^[^']*'([^']*)'[^']*violates the following Content Security Policy/);
+    if (/violates the following Content Security Policy/.test(s))
+      return !!csp && /^https:\/\/[\w-]+\.cloudfront\.net\//.test(csp[1]);
+    return ALLOWED_CONSOLE.some((re) => re.test(s));
+  };
   page.on("console", (m: ConsoleMessage) => {
     if (m.type() !== "error") return;
     const text = m.text();
@@ -49,7 +53,13 @@ test(
   { tag: "@smoke" },
   async ({ page }) => {
     const errors = watchConsole(page);
-    await page.goto("/dev/blux-pointe");
+    const res = await page.goto("/dev/blux-pointe");
+    // Svelte's hydration removes its replay handlers, so the live DOM cannot
+    // show what the server sent: read the server HTML for inline handlers too.
+    const ssr = (await res?.text()) ?? "";
+    const ssrReplayOnly = [...ssr.matchAll(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi)].every(
+      (m) => m[1] === '"this.__e=event"',
+    );
 
     // Chrome renders once (from the app layout, fed by the fixture page data).
     await expect(page.locator("footer")).toBeVisible();
@@ -63,7 +73,9 @@ test(
     // No unexpected console errors beyond the offline-render allowlist, read
     // once the client has hydrated.
     await page.locator("html[data-hydrated]").waitFor({ state: "attached" });
-    expect(uncoveredErrors(errors, await onlySvelteImageReplayHandlers(page))).toEqual([]);
+    expect(
+      uncoveredErrors(errors, ssrReplayOnly && (await onlySvelteImageReplayHandlers(page))),
+    ).toEqual([]);
 
     // Dump the rendered HTML so the maintenance coverage gate can score it
     // (POINTE_RENDERED_HTML → this path).

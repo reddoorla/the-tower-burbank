@@ -61,6 +61,12 @@ describe("stripNoopFontOnload", () => {
     expect(out).toContain('href="https://fonts.googleapis.com/css?family=Montserrat"');
   });
 
+  it("keeps the onload on a preload link, where the handler applies the sheet", () => {
+    const html =
+      '<link rel="preload" as="style" href="https://fonts.googleapis.com/css?family=Montserrat" onload="this.rel=\'stylesheet\'">';
+    expect(stripNoopFontOnload(html)).toBe(html);
+  });
+
   it("leaves other inline handlers alone", () => {
     const html = '<button onclick="go()">x</button>';
     expect(stripNoopFontOnload(html)).toBe(html);

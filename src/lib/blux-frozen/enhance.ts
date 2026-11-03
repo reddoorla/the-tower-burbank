@@ -67,12 +67,17 @@ export function rewriteCfEmails(html: string): string {
 }
 
 /**
- * The freeze's font link carries `onload="this.rel='stylesheet'"`, a no-op: the
- * link already has `rel="stylesheet"`. Under the site's CSP, the inline handler
- * is blocked and logs a console error on every page, so drop it at render time.
+ * The freeze's font link carries `onload="this.rel='stylesheet'"`, a no-op on a
+ * link that already has `rel="stylesheet"`. Under the site's CSP, the inline
+ * handler is blocked and logs a console error on every page, so drop it at
+ * render time. Only inside a `rel="stylesheet"` link: on a loadCSS-style
+ * `rel="preload"` link the handler is what applies the stylesheet, so it stays.
  */
 export function stripNoopFontOnload(html: string): string {
-  return html.replace(/ onload="this\.rel='stylesheet'"/g, "");
+  return html.replace(
+    /(<link\b[^>]*\brel="stylesheet"[^>]*?) onload="this\.rel='stylesheet'"/g,
+    "$1",
+  );
 }
 
 /** All render-time markup repairs, applied after token substitution. */
