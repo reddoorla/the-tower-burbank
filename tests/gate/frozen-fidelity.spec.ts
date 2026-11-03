@@ -19,6 +19,17 @@ const allowed = (s: string) =>
   !/violates the following Content Security Policy/.test(s) &&
   ALLOWED_CONSOLE.some((re) => re.test(s));
 
+// The host a console message's location points at, or "" when it has none. The
+// allowlists name third-party hosts, so a location is matched by its host only:
+// a local asset whose path happens to name one (/images/vimeo-poster.jpg) is ours.
+const hostOf = (u: string) => {
+  try {
+    return new URL(u).hostname;
+  } catch {
+    return "";
+  }
+};
+
 // The freeze settles + bakes the export's layout at a 1440px viewport; render
 // it at that same width.
 test.use({ viewport: { width: 1440, height: 900 } });
@@ -46,7 +57,7 @@ test(
       if (
         m.type() === "error" &&
         !allowed(m.text()) &&
-        (csp || !allowed(m.location()?.url ?? ""))
+        (csp || !allowed(hostOf(m.location()?.url ?? "")))
       ) {
         errors.push(`[console.error] ${m.text()}`);
       }
@@ -92,47 +103,49 @@ test(
     //   sheets with each import's own media, so `<style media="print">`, an
     //   `@media print` wrapper, an `@import ... print`, a dropped sheet and a
     //   sheet served cut short all fail.
-    const applied = await page.evaluate(
-      ({ css, html }) => {
-        const matches = (sel: string) => {
-          try {
-            return document.querySelector(sel) !== null;
-          } catch {
-            return false;
-          }
-        };
-        const own = new CSSStyleSheet();
-        own.replaceSync(css);
-        const named = [...own.cssRules]
-          .filter((r): r is CSSStyleRule => r instanceof CSSStyleRule)
-          .filter((r) => r.selectorText.split(",").every((part) => /[.#]-?[_a-zA-Z]/.test(part)));
-        const tokens = (re: RegExp) =>
-          new Set(named.flatMap((r) => [...r.selectorText.matchAll(re)].map((m) => m[1])));
-        const ownClasses = tokens(/\.(-?[_a-zA-Z][\w-]*)/g);
-        const ownIds = tokens(/#(-?[_a-zA-Z][\w-]*)/g);
-        const templateDoc = new DOMParser().parseFromString(html, "text/html");
-
-        // Every artifact class or id an element wears, as `.c` / `#i` tokens.
-        const worn = (e: Element) => [
+    // The template is parsed on a blank page of its own, never on the route: any
+    // parse of it here (DOMParser, <template>, a created document) checks its
+    // font link's inline onload against the route's CSP and logs a violation,
+    // though nothing runs. about:blank has no CSP, and the parse runs no handler.
+    const survey = ({ css, html }: { css: string; html: string | null }) => {
+      const own = new CSSStyleSheet();
+      own.replaceSync(css);
+      const named = [...own.cssRules]
+        .filter((r): r is CSSStyleRule => r instanceof CSSStyleRule)
+        .filter((r) => r.selectorText.split(",").every((part) => /[.#]-?[_a-zA-Z]/.test(part)));
+      const tokens = (re: RegExp) =>
+        new Set(named.flatMap((r) => [...r.selectorText.matchAll(re)].map((m) => m[1])));
+      const ownClasses = tokens(/\.(-?[_a-zA-Z][\w-]*)/g);
+      const ownIds = tokens(/#(-?[_a-zA-Z][\w-]*)/g);
+      const doc = html === null ? document : new DOMParser().parseFromString(html, "text/html");
+      // Every artifact class or id an element wears, as `.c` / `#i` tokens.
+      const counts: Record<string, number> = {};
+      let wearing = 0;
+      for (const e of doc.body.querySelectorAll("*")) {
+        const w = [
           ...[...e.classList].filter((c) => ownClasses.has(c)).map((c) => `.${c}`),
           ...(ownIds.has(e.id) ? [`#${e.id}`] : []),
         ];
-        const census = (root: Element) => {
-          const counts = new Map<string, number>();
-          let wearing = 0;
-          for (const e of root.querySelectorAll("*")) {
-            const w = worn(e);
-            if (w.length > 0) wearing++;
-            for (const t of w) counts.set(t, (counts.get(t) ?? 0) + 1);
-          }
-          return { wearing, counts };
-        };
-        const expected = census(templateDoc.body);
-        const rendered = census(document.body);
-        const mismatched = [...expected.counts]
-          .filter(([t, n]) => (rendered.counts.get(t) ?? 0) !== n)
-          .map(([t, n]) => `${t} ${rendered.counts.get(t) ?? 0}/${n}`);
-
+        if (w.length > 0) wearing++;
+        for (const t of w) counts[t] = (counts[t] ?? 0) + 1;
+      }
+      // For each named rule, in stylesheet order: does it match this document?
+      const hits = named.map((r) => {
+        try {
+          return doc.querySelector(r.selectorText) !== null;
+        } catch {
+          return false;
+        }
+      });
+      return { selectors: named.map((r) => r.selectorText), wearing, counts, hits };
+    };
+    const blank = await page.context().newPage();
+    const expected = await blank.evaluate(survey, { css: freezeCss, html: freezeHtml });
+    await blank.close();
+    const rendered = await page.evaluate(survey, { css: freezeCss, html: null });
+    // Every selector text of a live rule in a sheet the screen applies.
+    const live = new Set(
+      await page.evaluate(() => {
         const onScreen = (media: MediaList) =>
           media.length === 0 || window.matchMedia(media.mediaText).matches;
         const liveRules = (sheet: CSSStyleSheet | null): string[] => {
@@ -151,31 +164,20 @@ test(
             return []; // a cross-origin font sheet
           }
         };
-        const live = new Set([...document.styleSheets].flatMap(liveRules));
-        const inTemplate = (sel: string) => {
-          try {
-            return templateDoc.querySelector(sel) !== null;
-          } catch {
-            return false;
-          }
-        };
-        const onPage = named.filter((r) => matches(r.selectorText));
-        const lost = named
-          .filter((r) => inTemplate(r.selectorText) && !matches(r.selectorText))
-          .map((r) => r.selectorText);
-        return {
-          templateWearing: expected.wearing,
-          wearing: rendered.wearing,
-          mismatched,
-          lost,
-          onPage: onPage.length,
-          notLive: onPage.filter((r) => !live.has(r.selectorText)).map((r) => r.selectorText),
-        };
-      },
-      // Parsed with its inline handlers removed: a DOMParser parse runs under the
-      // page's CSP, and the template's font-link onload would log a violation.
-      { css: freezeCss, html: freezeHtml.replace(/\son[a-z]+="[^"]*"/gi, "") },
+        return [...document.styleSheets].flatMap(liveRules);
+      }),
     );
+    const onPage = rendered.selectors.filter((_, i) => rendered.hits[i]);
+    const applied = {
+      templateWearing: expected.wearing,
+      wearing: rendered.wearing,
+      mismatched: Object.entries(expected.counts)
+        .filter(([t, n]) => (rendered.counts[t] ?? 0) !== n)
+        .map(([t, n]) => `${t} ${rendered.counts[t] ?? 0}/${n}`),
+      lost: expected.selectors.filter((_, i) => expected.hits[i] && !rendered.hits[i]),
+      onPage: onPage.length,
+      notLive: onPage.filter((sel) => !live.has(sel)),
+    };
     expect(
       applied.wearing,
       `rendered elements wearing an artifact class or id (the template has ${applied.templateWearing})`,

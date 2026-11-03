@@ -22,6 +22,17 @@ const ALLOWED_CONSOLE: RegExp[] = [
   /turnstile|challenges\.cloudflare/i,
 ];
 
+// The host a console message's location points at, or "" when it has none. The
+// allowlists name third-party hosts, so a location is matched by its host only:
+// a local asset whose path happens to name one (/images/vimeo-poster.jpg) is ours.
+const hostOf = (u: string) => {
+  try {
+    return new URL(u).hostname;
+  } catch {
+    return "";
+  }
+};
+
 function watchConsole(page: Page): string[] {
   const errors: string[] = [];
   // A CSP violation is never noise, whatever host it names. The one exception is
@@ -44,7 +55,7 @@ function watchConsole(page: Page): string[] {
     const text = m.text();
     const url = m.location()?.url ?? "";
     const csp = /violates the following Content Security Policy/.test(text);
-    if (allowed(text) || (!csp && allowed(url))) return;
+    if (allowed(text) || (!csp && allowed(hostOf(url)))) return;
     errors.push(`[console.error] ${text}${url ? ` (${url})` : ""}`);
   });
   page.on("pageerror", (e) => {
