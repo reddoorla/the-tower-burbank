@@ -1,5 +1,6 @@
 import { test, expect, type Page, type ConsoleMessage } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { onlySvelteImageReplayHandlers, uncoveredErrors } from "./csp-console";
 
 // Plan 4d fidelity gate. Drives the offline /dev/blux-pointe route (the real
 // the-pointe catalog fixture rendered through the production SliceZone + chrome)
@@ -21,14 +22,40 @@ const ALLOWED_CONSOLE: RegExp[] = [
   /turnstile|challenges\.cloudflare/i,
 ];
 
+// The host a console message's location points at, or "" when it has none. The
+// allowlists name third-party hosts, so a location is matched by its host only:
+// a local asset whose path happens to name one (/images/vimeo-poster.jpg) is ours.
+const hostOf = (u: string) => {
+  try {
+    return new URL(u).hostname;
+  } catch {
+    return "";
+  }
+};
+
 function watchConsole(page: Page): string[] {
   const errors: string[] = [];
-  const allowed = (s: string) => !!s && ALLOWED_CONSOLE.some((re) => re.test(s));
+  // A CSP violation is never noise, whatever host it names. The one exception is
+  // the export CDN: the fixture's export images and its .mp4 come from cloudfront,
+  // which the policy does not list. Only a blocked cloudfront URL is allowed;
+  // other CSP messages (inline handlers, a blocked Vimeo script) fall through.
+  const allowed = (s: string) => {
+    if (!s) return false;
+    const csp = s.match(/^[^']*'([^']*)'[^']*violates the following Content Security Policy/);
+    if (/violates the following Content Security Policy/.test(s))
+      return (
+        !!csp &&
+        /^Loading (the image|media from)\s/.test(s) &&
+        /^https:\/\/[\w-]+\.cloudfront\.net\//.test(csp[1])
+      );
+    return ALLOWED_CONSOLE.some((re) => re.test(s));
+  };
   page.on("console", (m: ConsoleMessage) => {
     if (m.type() !== "error") return;
     const text = m.text();
     const url = m.location()?.url ?? "";
-    if (allowed(text) || allowed(url)) return;
+    const csp = /violates the following Content Security Policy/.test(text);
+    if (allowed(text) || (!csp && allowed(hostOf(url)))) return;
     errors.push(`[console.error] ${text}${url ? ` (${url})` : ""}`);
   });
   page.on("pageerror", (e) => {
@@ -37,34 +64,48 @@ function watchConsole(page: Page): string[] {
   return errors;
 }
 
-test("the-pointe catalog fixture renders faithfully; HTML dumped for coverage", async ({
-  page,
-}) => {
-  const errors = watchConsole(page);
-  await page.goto("/dev/blux-pointe");
+test(
+  "the-pointe catalog fixture renders faithfully; HTML dumped for coverage",
+  { tag: "@smoke" },
+  async ({ page }) => {
+    const errors = watchConsole(page);
+    const res = await page.goto("/dev/blux-pointe");
+    // Svelte's hydration removes its replay handlers, so the live DOM cannot
+    // show what the server sent: read the server HTML for inline handlers too.
+    const ssr = (await res?.text()) ?? "";
+    const ssrReplayOnly = [...ssr.matchAll(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi)].every(
+      (m) => m[1] === '"this.__e=event"',
+    );
 
-  // Chrome renders once (from the app layout, fed by the fixture page data).
-  await expect(page.locator("footer")).toBeVisible();
-  await expect(page.getByText("Todd Doney")).toBeVisible();
-  // The map widget's static markup is present (hydration is keyless in CI).
-  await expect(page.locator(".blux-map")).toHaveCount(1);
-  await expect(page.locator("#burbank_map")).toHaveCount(1);
-  // Band content rendered through the SliceZone.
-  await expect(page.getByText(/Burbank/i).first()).toBeVisible();
+    // Chrome renders once (from the app layout, fed by the fixture page data).
+    await expect(page.locator("footer")).toBeVisible();
+    await expect(page.getByText("Todd Doney")).toBeVisible();
+    // The map widget's static markup is present (hydration is keyless in CI).
+    await expect(page.locator(".blux-map").first()).toBeAttached();
+    await expect(page.locator("#burbank_map")).toBeAttached();
+    // Band content rendered through the SliceZone.
+    await expect(page.getByText(/Burbank/i).first()).toBeVisible();
 
-  // No unexpected console errors beyond the offline-render allowlist.
-  expect(errors).toEqual([]);
+    // No unexpected console errors beyond the offline-render allowlist, read
+    // once the client has hydrated.
+    await page.locator("html[data-hydrated]").waitFor({ state: "attached" });
+    expect(
+      uncoveredErrors(errors, ssrReplayOnly && (await onlySvelteImageReplayHandlers(page))),
+    ).toEqual([]);
 
-  // Dump the rendered HTML so the maintenance coverage gate can score it
-  // (POINTE_RENDERED_HTML → this path).
-  const html = await page.content();
-  mkdirSync("test-results/gate", { recursive: true });
-  writeFileSync("test-results/gate/pointe-rendered.html", html);
-});
+    // Dump the rendered HTML so the maintenance coverage gate can score it
+    // (POINTE_RENDERED_HTML → this path).
+    const html = await page.content();
+    mkdirSync("test-results/gate", { recursive: true });
+    writeFileSync("test-results/gate/pointe-rendered.html", html);
+  },
+);
 
-// The visual-fidelity layer: assert the emitted data actually resolves into
-// layout (a real flex-basis grid, band padding, cover crops, type-role
-// wrapping, laid-out heights). A failure here is a REAL fidelity gap — fix the
+// The visual-fidelity layer. Untagged on purpose, so it runs in the scaffold
+// tier (`pnpm test:scaffold`) and never blocks a merge: it pins pixel values
+// (a role font above 40px, a band taller than 600px) from the comp.
+// Assert the emitted data actually resolves into layout (a real flex-basis grid,
+// band padding, cover crops, type-role wrapping, laid-out heights). A failure here is a REAL fidelity gap — fix the
 // render/emit, never weaken the assertion.
 test("catalog visual layer resolves grid, cover, padding, and type roles", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });

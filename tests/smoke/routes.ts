@@ -10,8 +10,9 @@
 // the repository name — mirroring `isPlaceholderRepo` in src/lib/prismicio.ts
 // and the entries() prerender guard in the home route. The moment a fork wires
 // a real Prismic repo in slicemachine.config.json, the same entry expects 200
-// with zero edits. The hydration marker `footer` is the shared layout footer,
-// present on every page including the error page.
+// with zero edits. The render marker `footer` is the shared layout footer,
+// present on every page including the error page. It is server-rendered, so it
+// proves the render only; the specs wait on `html[data-hydrated]` for hydration.
 
 // Playwright runs this file as native ESM in Node, where JSON imports require
 // the explicit attribute (unlike Vite-bundled src/lib/prismicio.ts).
@@ -22,7 +23,7 @@ export type SmokeRoute = {
   path: string;
   /** Human-readable label used in the test title. */
   name: string;
-  /** CSS selector asserted visible after load (hydration proof). Default: skip. */
+  /** CSS selector asserted visible after load (render proof, not hydration). Default: skip. */
   hydrationMarker?: string;
   /** Expected HTTP status. Default: 200. */
   expectStatus?: number;

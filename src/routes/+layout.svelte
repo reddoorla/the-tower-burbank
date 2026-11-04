@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { PrismicPreview } from "@prismicio/svelte/kit";
   import { page } from "$app/state";
   import { afterNavigate, beforeNavigate } from "$app/navigation";
@@ -24,6 +25,15 @@
   // instantly instead of gliding under app.css's smooth-scroll. See the util.
   beforeNavigate(disableSmoothScroll);
   afterNavigate(restoreSmoothScroll);
+
+  // Set once the app has hydrated (onMount never runs on the server), so a test
+  // can wait for the client to be live. It is absent with scripting off and
+  // before hydration, and a throw in a child's onMount stops this one, so the
+  // marker never appears on a page whose client code broke. Nothing styles from
+  // it. Same marker as reddoor-starter's root layout.
+  onMount(() => {
+    document.documentElement.dataset.hydrated = "";
+  });
 </script>
 
 <!-- Single head source for the whole app. Static routes feed their title
