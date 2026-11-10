@@ -49,8 +49,19 @@ const routes: prismic.ClientConfig["routes"] = [
   },
 ];
 
+// Since 2026-11-03 Prismic's CDN edge for this repository
+// (`the-tower-burbank.cdn.prismic.io`) answers every request with a CloudFront/S3
+// 403 "AccessDenied", while the origin host still serves the published content,
+// and the CDN of every other fleet repository answers normally. Every Prismic
+// read threw, the frozen home lookup turned that into a miss, and prerender
+// failed with `404 /`. Reading from the origin host costs the CDN cache; the
+// pages are prerendered, so only `/health` and preview renders read at runtime. Go back to the CDN (delete this option and its
+// test in prismicio.test.ts) once the CDN URL answers 200 again.
+const documentAPIEndpoint = `https://${repositoryName}.prismic.io/api/v2`;
+
 export const createClient = ({ cookies, ...config }: CreateClientConfig = {}) => {
   const client = prismic.createClient(repositoryName, {
+    documentAPIEndpoint,
     routes: isFrozenSite ? undefined : routes,
     ...config,
   });
